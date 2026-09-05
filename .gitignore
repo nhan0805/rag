@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+logs/
+.pytest_cache/
+.venv/
+.DS_Store
+.env.rag
+.env.pgvector
+*.ses
+
+# Local LLM prompts and responses may contain document/user data.

@@ -1,0 +1,78 @@
+services:
+  pgvector:
+    image: ankane/pgvector:latest
+    container_name: pgvector
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT}:${POSTGRES_PORT}"
+    env_file:
+      - .env.common
+      - .env.pgvector
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_user -d ai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  llama31-8b:
+    build:
+      context: ./llm-llama-3-8b
+      dockerfile: Dockerfile
+    container_name: llama31-8b
+    env_file:
+      - .env.common
+      - .env.ollama.llama3.8b
+    ports:
+      - "${OLLAMA_LLAMA31_HOST_PORT}:${OLLAMA_LLAMA31_PORT}"
+    volumes:
+      - ollama_llama31_data:/root/.ollama
+    restart: unless-stopped
+
+  nomic-embed-text:
+    build:
+      context: ./llm-nomic-embed-text
+      dockerfile: Dockerfile
+    container_name: nomic-embed-text
+    env_file:
+      - .env.common
+      - .env.nomic.embed.text
+    ports:
+      - "${OLLAMA_NOMIC_EMBED_TEXT_HOST_PORT}:${OLLAMA_NOMIC_EMBED_TEXT_PORT}"
+    volumes:
+      - ollama_nomic_embed_text_data:/root/.ollama
+    restart: unless-stopped
+
+  rag-app:
+    build:
+      context: ./rag_pipeline
+      dockerfile: Dockerfile
+    container_name: rag-app
+    env_file:
+      - .env.common
+      - .env.rag
+    volumes:
+      - ./rag_pipeline:/app
+      - ./input:/app/input
+      - rerank_cache:/opt/rerank-cache
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      pgvector:
+        condition: service_healthy
+      llama31-8b:
+        condition: service_started
+      nomic-embed-text:
+        condition: service_started
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+volumes:
+  pgvector_data:
+  ollama_llama31_data:
+  ollama_nomic_embed_text_data:
+  rerank_cache:

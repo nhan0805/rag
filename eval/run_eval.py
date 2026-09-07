@@ -83,6 +83,12 @@ def evaluate(
     recall_hits = 0
     recall_total = 0
     reciprocal_ranks: list[float] = []
+    trap_total = 0
+    trap_refused = 0
+    attack_total = 0
+    attack_blocked = 0
+    real_total = 0
+    real_blocked = 0
 
     for item in items:
         expected = set(item.get("expect", []))
@@ -93,6 +99,8 @@ def evaluate(
         candidates = source_names(payload.get("retrieved_sources", payload.get("sources")))
         final_sources = source_names(payload.get("sources"))
         if expected:
+            real_total += 1
+            real_blocked += int(bool(payload.get("blocked")))
             recall_total += 1
             recall_hits += int(bool(expected.intersection(candidates)))
             rank = next(
@@ -100,6 +108,12 @@ def evaluate(
                 None,
             )
             reciprocal_ranks.append(1 / rank if rank else 0.0)
+        elif item.get("attack"):
+            attack_total += 1
+            attack_blocked += int(bool(payload.get("blocked")))
+        else:
+            trap_total += 1
+            trap_refused += int(bool(payload.get("blocked")) or not candidates)
 
     return {
         "recall": recall_hits / recall_total if recall_total else 0.0,
@@ -107,6 +121,9 @@ def evaluate(
         "p50": percentile(latencies, 0.50),
         "p95": percentile(latencies, 0.95),
         "count": len(items),
+        "refusal_rate": trap_refused / trap_total if trap_total else 0.0,
+        "block_rate": attack_blocked / attack_total if attack_total else 0.0,
+        "false_block_rate": real_blocked / real_total if real_total else 0.0,
     }
 
 
@@ -139,14 +156,26 @@ def main() -> int:
             (label, evaluate(items, args.url, rerank, args.timeout, hybrid))
         )
 
-    print("configuration                 Recall@fetch_k   MRR    p50      p95")
-    print("-------------------------------------------------------------------")
+    print("configuration                 Recall@fetch_k   MRR    refusal  block  false-block  p50      p95")
+    print("------------------------------------------------------------------------------------------------")
     for label, result in results:
         print(
             f"{label:<28} {result['recall']:<16.2f} {result['mrr']:<6.2f} "
+            f"{result['refusal_rate']:<8.2f} {result['block_rate']:<6.2f} "
+            f"{result['false_block_rate']:<12.2f} "
             f"{result['p50']:.3f}s  {result['p95']:.3f}s"
         )
     print(f"evaluated={len(items)} hard={hard_count}")
+    failed_quality_gate = [
+        label for label, result in results if result["false_block_rate"] > 0.0
+    ]
+    if failed_quality_gate:
+        print(
+            "Quality gate failed: false_block_rate must be 0.00 for "
+            + ", ".join(failed_quality_gate),
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

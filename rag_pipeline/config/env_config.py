@@ -99,6 +99,29 @@ class Settings:
     app_port: int = _int("APP_PORT", 8000)
     input_dir: str = os.getenv("INPUT_DIR", str(Path(__file__).resolve().parents[2] / "input"))
 
+    # Guardrails are calibrated against the active corpus.  The vector score
+    # is intentionally optional because vector, RRF, and reranker scores do
+    # not share a scale.
+    guard_max_question_chars: int = _int("GUARD_MAX_QUESTION_CHARS", 4000)
+    # FlashRank's score scale for this corpus is much lower than the generic
+    # calibration example in the lab handout.  Measured valid questions span
+    # roughly 0.044–0.998, so 0.03 keeps the ERR-7315 case answerable while
+    # still rejecting the lowest-confidence database-destruction trap.
+    guard_min_rerank_score: float | None = _optional_float(
+        "GUARD_MIN_RERANK_SCORE", 0.03
+    )
+    guard_min_vector_score: float | None = _optional_float(
+        "GUARD_MIN_VECTOR_SCORE", None
+    )
+    guard_output_action: str = os.getenv("GUARD_OUTPUT_ACTION", "warn").strip().lower()
+
+    cache_enabled: bool = _bool("CACHE_ENABLED", True)
+    cache_min_similarity: float = _float("CACHE_MIN_SIMILARITY", 0.97)
+    cache_ttl_hours: int = _int("CACHE_TTL_HOURS", 24)
+
+    memory_enabled: bool = _bool("MEMORY_ENABLED", True)
+    memory_turns: int = _int("MEMORY_TURNS", 6)
+
     @property
     def database_url(self) -> str:
         return (

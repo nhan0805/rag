@@ -43,6 +43,31 @@ Log gồm system prompt, context/user prompt, câu trả lời và thống kê t
 gian từ Ollama. `LLM_LOG_FULL_CONTENT=true` chỉ nên dùng khi debug local vì
 prompt có thể chứa dữ liệu tài liệu hoặc dữ liệu người dùng.
 
+## Guardrail, cache và memory
+
+Lab production bổ sung ba lớp guardrail trong `rag_pipeline/guardrails/`:
+
+- input chặn prompt injection Anh/Việt và câu quá dài; PII chỉ được che trong log;
+- evidence chặn đường sinh câu khi không có bằng chứng đủ mạnh;
+- output chặn prompt leak, còn số liệu không có trong context mặc định chỉ cảnh báo.
+
+Ngưỡng mặc định được đo theo fixture và thang điểm FlashRank của stack này:
+`GUARD_MIN_RERANK_SCORE=0.03`. `GUARD_MIN_VECTOR_SCORE` để trống vì
+vector/RRF/reranker không cùng thang điểm. Khi thay corpus hoặc model, cần đo
+lại phân phối điểm trước khi đổi ngưỡng.
+
+Semantic cache dùng bảng `rag_query_cache`, khóa theo quyền đọc và cấu hình
+`rerank/hybrid`, TTL 24 giờ, và được vô hiệu hóa khi tài liệu re-index hoặc bị
+xóa. Chỉ câu trả lời có `document_id` mới được lưu. Có thể dọn cache bằng:
+
+```bash
+curl -X POST 'http://localhost:8000/eval/cache/purge?expired_only=true'
+```
+
+Memory bật với `MEMORY_ENABLED=true`; gửi thêm `conversation_id` và `user_id`
+trong `/chat` để câu hỏi phụ thuộc lượt trước được bổ ngữ cảnh. Lịch sử luôn
+được lọc theo cả hai trường này.
+
 Các model được pull lúc build nên lần đầu có thể mất vài phút và cần khoảng 6GB dung lượng. Compose mặc định không ép GPU để chạy được trên Docker Desktop không có GPU; nếu máy có GPU, có thể thêm device reservation theo hướng dẫn trong lab.
 
 ## Kiểm tra trực tiếp
@@ -71,6 +96,9 @@ docker exec -it pgvector psql -U ai_user -d ai_db \
 ```bash
 python eval/run_eval.py
 ```
+
+Bộ đo tách riêng `recall/mrr`, `refusal_rate`, `block_rate` và
+`false_block_rate`; golden set có cờ `attack: true` cho các câu injection.
 
 ## Test offline
 

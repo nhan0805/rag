@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from config.env_config import settings
+from guardrails.patterns import redact_pii
 from shared.logger import llm_file_logger, logger
 
 
@@ -70,15 +71,17 @@ def _log_llm_exchange(
         "eval_duration_ms": _duration_ms(data.get("eval_duration")),
         "client_elapsed_ms": round(elapsed_seconds * 1000, 2),
     }
+    safe_user_prompt, _ = redact_pii(user_prompt)
+    safe_output, _ = redact_pii(output)
     message = (
         "LLM exchange [%s] INPUT (system + user):\n%s\n--- USER PROMPT ---\n%s\n"
         "LLM exchange [%s] OUTPUT:\n%s\nLLM exchange [%s] USAGE: %s"
         % (
             stage,
             _logged_text(system_prompt),
-            _logged_text(user_prompt),
+            _logged_text(safe_user_prompt),
             stage,
-            _logged_text(output),
+            _logged_text(safe_output),
             stage,
             usage,
         )

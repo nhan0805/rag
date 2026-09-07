@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from uuid import UUID
 
+from config.db_connection import get_connection
 from config.env_config import settings
 from indexing.index_runner import index_all, index_file
 from shared.file_utils import safe_upload_name
@@ -53,3 +55,21 @@ def reindex_all() -> dict[str, object]:
         "total_chunks": sum(indexed.values()),
         "files": indexed,
     }
+
+
+@router.delete("/documents/{document_id}")
+def delete_document(document_id: UUID) -> dict[str, str]:
+    """Delete a document; the database trigger removes dependent cache rows."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM rag_documents WHERE id = %s",
+                (document_id,),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Xoá tài liệu thất bại: {exc}") from exc
+    return {"document_id": str(document_id), "status": "deleted"}

@@ -10,6 +10,7 @@ def _source_item(number: int, chunk: dict) -> dict:
     return {
         "n": number,
         "source": chunk["source_path"],
+        "document_id": chunk.get("document_id"),
         "chunk_index": chunk["chunk_index"],
         "score": chunk.get("score", chunk.get("rrf_score", vector_score)),
         "vector_score": vector_score,
@@ -35,11 +36,19 @@ def make_response(
     chunks: list[dict],
     candidate_chunks: list[dict] | None = None,
     hybrid_used: bool = False,
+    blocked: bool = False,
+    guardrail: dict | None = None,
+    cache_hit: bool = False,
+    cache_similarity: float | None = None,
 ) -> dict:
     response = {
         "answer": answer,
         "sources": make_sources(chunks),
         "hybrid_used": hybrid_used,
+        "blocked": blocked,
+        "guardrail": guardrail,
+        "cache_hit": cache_hit,
+        "cache_similarity": cache_similarity,
     }
     if candidate_chunks is not None:
         response["retrieved_sources"] = make_sources(candidate_chunks)

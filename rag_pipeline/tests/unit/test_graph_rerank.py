@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from retrieval.graph import run_graph
 from retrieval.rerank.base import BaseReranker
+from config.env_config import settings
 
 
 class FakeGraphReranker(BaseReranker):
@@ -48,7 +49,7 @@ class GraphRerankTests(unittest.TestCase):
         self.assertTrue(all(item["rerank_score"] is None for item in result["sources"]))
         get_backend.assert_not_called()
         retrieve.assert_called_once()
-        self.assertEqual(retrieve.call_args.kwargs["top_k"], 4)
+        self.assertEqual(retrieve.call_args.kwargs["top_k"], settings.top_k)
 
     @patch("retrieval.graph.top_k_chunks", return_value=[])
     @patch("retrieval.graph.embed_question", return_value=[0.0, 1.0])

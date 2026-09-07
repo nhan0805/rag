@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from config.db_connection import get_connection
 from config.env_config import settings
 from retrieval.hybrid.query_builder import build_tsquery
@@ -9,6 +11,7 @@ def lexical_search(
     question: str,
     limit: int | None = None,
     fetch_k: int | None = None,
+    allowed_classification_ids: Sequence[str] | None = None,
 ) -> list[dict]:
     """Find chunks using PostgreSQL full-text search and ``ts_rank``.
 
@@ -31,14 +34,21 @@ def lexical_search(
         return []
 
     config = settings.text_search_config
+    classification_clause = ""
+    params: list[object] = [config, tsquery]
+    if allowed_classification_ids:
+        classification_clause = "AND d.classification_id = ANY(%s)"
+        params.append(list(allowed_classification_ids))
+    params.append(fetch_limit)
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             WITH query AS (
                 SELECT to_tsquery(%s, %s) AS tsquery
             )
             SELECT
                 c.id,
+                c.document_id,
                 c.chunk_index,
                 c.content,
                 c.token_count,
@@ -49,21 +59,23 @@ def lexical_search(
             JOIN rag_documents d ON d.id = c.document_id
             CROSS JOIN query
             WHERE c.content_tsv @@ query.tsquery
+              {classification_clause}
             ORDER BY lexical_score DESC, c.id
             LIMIT %s
             """,
-            (config, tsquery, fetch_limit),
+            tuple(params),
         ).fetchall()
 
     return [
         {
             "chunk_id": str(row[0]),
-            "chunk_index": row[1],
-            "content": row[2],
-            "token_count": row[3],
-            "source_path": row[4],
-            "title": row[5],
-            "lexical_score": float(row[6]),
+            "document_id": str(row[1]),
+            "chunk_index": row[2],
+            "content": row[3],
+            "token_count": row[4],
+            "source_path": row[5],
+            "title": row[6],
+            "lexical_score": float(row[7]),
             "lexical_rank": rank,
             "found_by": ["lexical"],
         }

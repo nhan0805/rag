@@ -12,6 +12,7 @@ def top_k_chunks(
     top_k: int | None = None,
     fetch_k: int | None = None,
     similarity_threshold: float | None = None,
+    allowed_classification_ids: Sequence[str] | None = None,
 ) -> list[dict]:
     """Retrieve candidates in vector order and preserve their original rank.
 
@@ -28,19 +29,24 @@ def top_k_chunks(
         if similarity_threshold is None
         else similarity_threshold
     )
-    threshold_clause = ""
+    clauses: list[str] = []
     params: list[object] = [embedding]
+    if allowed_classification_ids:
+        clauses.append("d.classification_id = ANY(%s)")
+        params.append(list(allowed_classification_ids))
     if threshold > 0:
-        threshold_clause = "WHERE 1 - (e.embedding <=> %s::vector) >= %s"
+        clauses.append("1 - (e.embedding <=> %s::vector) >= %s")
         params.extend([embedding, threshold])
     params.append(embedding)
     params.append(limit)
+    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     with get_connection() as conn:
         rows = conn.execute(
             f"""
             SELECT
                 c.id,
+                c.document_id,
                 c.chunk_index,
                 c.content,
                 c.token_count,
@@ -49,7 +55,7 @@ def top_k_chunks(
             FROM rag_embeddings e
             JOIN rag_chunks c ON c.id = e.chunk_id
             JOIN rag_documents d ON d.id = c.document_id
-            {threshold_clause}
+            {where_clause}
             ORDER BY e.embedding <=> %s::vector
             LIMIT %s
             """,
@@ -59,12 +65,13 @@ def top_k_chunks(
     return [
         {
             "chunk_id": str(row[0]),
-            "chunk_index": row[1],
-            "content": row[2],
-            "token_count": row[3],
-            "source_path": row[4],
-            "similarity": float(row[5]),
-            "vector_score": float(row[5]),
+            "document_id": str(row[1]),
+            "chunk_index": row[2],
+            "content": row[3],
+            "token_count": row[4],
+            "source_path": row[5],
+            "similarity": float(row[6]),
+            "vector_score": float(row[6]),
             "vector_rank": rank,
         }
         for rank, row in enumerate(rows, start=1)

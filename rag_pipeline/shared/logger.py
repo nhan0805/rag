@@ -11,8 +11,8 @@ logging.basicConfig(
 logger = logging.getLogger("session4-rag")
 
 
-def _logging_enabled() -> bool:
-    return os.getenv("LLM_LOG_ENABLED", "false").strip().lower() in {
+def _logging_enabled(name: str, default: bool = False) -> bool:
+    return os.getenv(name, str(default).lower()).strip().lower() in {
         "1",
         "true",
         "yes",
@@ -20,15 +20,21 @@ def _logging_enabled() -> bool:
     }
 
 
-def _make_llm_file_logger() -> logging.Logger:
-    file_logger = logging.getLogger("session4-rag.llm")
+def _make_file_logger(
+    logger_name: str,
+    enabled_env: str,
+    path_env: str,
+    default_path: str,
+    default_enabled: bool = False,
+) -> logging.Logger:
+    file_logger = logging.getLogger(logger_name)
     file_logger.setLevel(logging.INFO)
     file_logger.propagate = False
 
-    if not _logging_enabled():
+    if not _logging_enabled(enabled_env, default_enabled):
         return file_logger
 
-    log_path = Path(os.getenv("LLM_LOG_FILE", "logs/llm.log"))
+    log_path = Path(os.getenv(path_env, default_path))
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         handler = RotatingFileHandler(
@@ -46,4 +52,16 @@ def _make_llm_file_logger() -> logging.Logger:
     return file_logger
 
 
-llm_file_logger = _make_llm_file_logger()
+llm_file_logger = _make_file_logger(
+    "session4-rag.llm",
+    "LLM_LOG_ENABLED",
+    "LLM_LOG_FILE",
+    "logs/llm.log",
+)
+guardrail_file_logger = _make_file_logger(
+    "session4-rag.guardrail",
+    "GUARDRAIL_LOG_ENABLED",
+    "GUARDRAIL_LOG_FILE",
+    "logs/guardrail.log",
+    default_enabled=True,
+)

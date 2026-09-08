@@ -27,6 +27,12 @@ class GuardrailTests(unittest.TestCase):
         self.assertIn("[NATIONAL-ID]", verdict.redacted or "")
         self.assertIn("pii:NATIONAL-ID", verdict.warnings)
 
+    def test_contextual_short_cccd_is_redacted_but_not_blocked(self):
+        verdict = check_question("Tôi có số CCCD 0987868 cần được hỗ trợ")
+        self.assertTrue(verdict.allowed)
+        self.assertIn("CCCD [NATIONAL-ID]", verdict.redacted or "")
+        self.assertIn("pii:NATIONAL-ID", verdict.warnings)
+
     def test_no_evidence_is_blocked_and_good_evidence_is_allowed(self):
         self.assertFalse(check_retrieval([]).allowed)
         self.assertTrue(check_retrieval([{"content": "policy", "rerank_score": 0.9}]).allowed)

@@ -42,7 +42,14 @@ INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 # These are warnings only.  A user may paste their own identifier into a
 # support question; rejecting that question is the wrong security boundary.
+_CONTEXTUAL_NATIONAL_ID = re.compile(
+    r"(?P<prefix>\b(?:cccd|căn cước(?: công dân)?|can cuoc(?: cong dan)?)\b[^0-9]{0,24})"
+    r"(?P<value>\d{7,12})(?!\d)",
+    re.IGNORECASE,
+)
+
 PII_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("NATIONAL-ID", _CONTEXTUAL_NATIONAL_ID),
     ("NATIONAL-ID", re.compile(r"(?<!\d)\d{9,12}(?!\d)")),
     ("PHONE", re.compile(r"(?<!\d)(?:\+?84|0)(?:[ .-]?\d){8,10}(?!\d)")),
     (
@@ -57,6 +64,12 @@ def redact_pii(text: str) -> tuple[str, list[str]]:
     found: list[str] = []
     for label, pattern in PII_PATTERNS:
         if pattern.search(redacted):
-            found.append(label)
-            redacted = pattern.sub(f"[{label}]", redacted)
+            if label not in found:
+                found.append(label)
+            if pattern is _CONTEXTUAL_NATIONAL_ID:
+                redacted = pattern.sub(
+                    lambda match: f"{match.group('prefix')}[{label}]", redacted
+                )
+            else:
+                redacted = pattern.sub(f"[{label}]", redacted)
     return redacted, found

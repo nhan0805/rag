@@ -6,7 +6,7 @@ from typing import TypedDict
 from config.env_config import settings
 from guardrails import GuardVerdict, check_answer, check_question, check_retrieval
 from memory.contextualise import contextualise
-from memory.store import append_turn, recent_turns
+from memory.store import append_turn, log_memory_event, recent_turns
 from retrieval.cache.key import scope_key
 from retrieval.cache.store import lookup as cache_lookup
 from retrieval.cache.store import save as cache_save
@@ -94,14 +94,28 @@ def _guard_question_node(state: RAGState) -> None:
 
 def _contextualise_node(state: RAGState) -> None:
     conversation_id = state.get("conversation_id")
-    if not settings.memory_enabled or not conversation_id:
+    if not settings.memory_enabled:
+        log_memory_event("skip", reason="disabled")
         return
+    if not conversation_id:
+        log_memory_event("skip", reason="no_conversation")
+        return
+    original_question = state["question"]
+    user_id = state.get("user_id", "anonymous")
     history = recent_turns(
         conversation_id,
-        state.get("user_id", "anonymous"),
+        user_id,
         n=settings.memory_turns,
     )
-    state["question"] = contextualise(state["question"], history)
+    state["question"] = contextualise(original_question, history)
+    log_memory_event(
+        "context",
+        conversation_id,
+        user_id,
+        turns=len(history),
+        changed=int(state["question"] != original_question),
+        question_chars=len(original_question),
+    )
 
 
 def _embed_question_node(state: RAGState) -> None:
@@ -282,20 +296,31 @@ def _store_cache_node(state: RAGState) -> None:
 
 def _store_memory_node(state: RAGState) -> None:
     conversation_id = state.get("conversation_id")
-    if (
-        not settings.memory_enabled
-        or not conversation_id
-        or state.get("blocked")
-    ):
+    user_id = state.get("user_id", "anonymous")
+    if not settings.memory_enabled:
+        log_memory_event("skip", reason="disabled")
+        return
+    if not conversation_id:
+        log_memory_event("skip", reason="no_conversation", user_id=user_id)
+        return
+    if state.get("blocked"):
+        log_memory_event("skip", conversation_id, user_id, reason="blocked")
         return
     try:
         append_turn(
             conversation_id,
-            state.get("user_id", "anonymous"),
+            user_id,
             state["question"],
             state.get("answer", ""),
         )
     except Exception as exc:
+        log_memory_event(
+            "error",
+            conversation_id,
+            user_id,
+            operation="write",
+            error_type=type(exc).__name__,
+        )
         logger.warning("Memory save skipped: %s", exc)
 
 

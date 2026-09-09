@@ -1,6 +1,8 @@
 import unittest
+from unittest.mock import patch
 
 from memory.contextualise import contextualise
+from memory.store import log_memory_event
 
 
 class MemoryContextTests(unittest.TestCase):
@@ -19,6 +21,22 @@ class MemoryContextTests(unittest.TestCase):
         )
         self.assertIn("phép năm", result)
         self.assertIn("nghỉ ốm", result)
+
+    @patch("memory.store.memory_file_logger.info")
+    def test_memory_telemetry_hashes_identifiers(self, info):
+        log_memory_event(
+            "write",
+            "conversation-with-sensitive-name",
+            "user-with-sensitive-name",
+            question_chars=12,
+            answer_chars=20,
+        )
+        message = str(info.call_args)
+        self.assertIn("memory_%s %s", message)
+        self.assertIn("write", message)
+        self.assertNotIn("conversation-with-sensitive-name", message)
+        self.assertNotIn("user-with-sensitive-name", message)
+        self.assertIn("question_chars=12", message)
 
 
 if __name__ == "__main__":

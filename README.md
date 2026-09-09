@@ -68,6 +68,17 @@ Memory bật với `MEMORY_ENABLED=true`; UI giữ `conversation_id` để câu 
 thuộc lượt trước được bổ ngữ cảnh. Quyền đọc của `/chat` không lấy từ body mà
 được đọc mới từ DB theo token ở từng request.
 
+Memory telemetry được ghi riêng vào `rag_pipeline/logs/memory.log` khi bật
+`MEMORY_LOG_ENABLED=true`:
+
+```bash
+tail -f rag_pipeline/logs/memory.log
+```
+
+Log có các event `memory_read`, `memory_context`, `memory_write` và
+`memory_skip`. Conversation/user được hash; câu hỏi và câu trả lời không ghi
+nguyên văn, chỉ có số ký tự và trạng thái contextualise.
+
 ## Lab 4 — permissions và vòng đời tài liệu
 
 Schema tạo `rag_classifications`, `rag_roles`, `rag_role_classifications` và

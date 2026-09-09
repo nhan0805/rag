@@ -48,7 +48,7 @@ def _make_file_logger(
         )
         file_logger.addHandler(handler)
     except OSError as exc:
-        logger.warning("Không thể mở LLM log file %s: %s", log_path, exc)
+        logger.warning("Không thể mở log file %s: %s", log_path, exc)
     return file_logger
 
 
@@ -64,4 +64,11 @@ guardrail_file_logger = _make_file_logger(
     "GUARDRAIL_LOG_FILE",
     "logs/guardrail.log",
     default_enabled=True,
+)
+memory_file_logger = _make_file_logger(
+    "session4-rag.memory",
+    "MEMORY_LOG_ENABLED",
+    "MEMORY_LOG_FILE",
+    "logs/memory.log",
+    default_enabled=False,
 )

@@ -121,6 +121,7 @@ class Settings:
 
     memory_enabled: bool = _bool("MEMORY_ENABLED", True)
     memory_turns: int = _int("MEMORY_TURNS", 6)
+    memory_log_question: bool = _bool("MEMORY_LOG_QUESTION", False)
 
     # Authentication and authorization.  Roles/classifications are resolved
     # from PostgreSQL on every request; they are deliberately not embedded in

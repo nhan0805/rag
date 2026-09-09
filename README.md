@@ -79,6 +79,11 @@ Log có các event `memory_read`, `memory_context`, `memory_write` và
 `memory_skip`. Conversation/user được hash; câu hỏi và câu trả lời không ghi
 nguyên văn, chỉ có số ký tự và trạng thái contextualise.
 
+Khi cần debug input memory ở local, bật `MEMORY_LOG_QUESTION=true`. Khi đó
+`memory_context` sẽ ghi `input_question` và
+`contextualized_question`; không bật tùy chọn này khi chia sẻ log vì câu hỏi
+có thể chứa PII.
+
 ## Lab 4 — permissions và vòng đời tài liệu
 
 Schema tạo `rag_classifications`, `rag_roles`, `rag_role_classifications` và

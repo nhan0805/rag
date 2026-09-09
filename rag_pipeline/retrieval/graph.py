@@ -115,6 +115,8 @@ def _contextualise_node(state: RAGState) -> None:
         turns=len(history),
         changed=int(state["question"] != original_question),
         question_chars=len(original_question),
+        input_question=original_question,
+        contextualized_question=state["question"],
     )
 
 

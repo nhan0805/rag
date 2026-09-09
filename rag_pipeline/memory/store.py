@@ -22,8 +22,13 @@ def log_memory_event(
     safe_fields = {
         "conversation": _fingerprint(conversation_id) if conversation_id else "none",
         "user": _fingerprint(user_id) if user_id else "none",
-        **fields,
     }
+    for key, value in fields.items():
+        if key in {"input_question", "contextualized_question"}:
+            if settings.memory_log_question:
+                safe_fields[key] = value
+        else:
+            safe_fields[key] = value
     details = " ".join(f"{key}={safe_fields[key]}" for key in sorted(safe_fields))
     memory_file_logger.info("memory_%s %s", event, details)
 

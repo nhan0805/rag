@@ -48,7 +48,7 @@
   <section class="panel">
     <div id="auth" class="auth">
       <input id="email" type="email" placeholder="Email" autocomplete="username">
-      <input id="password" type="password" placeholder="Mật khẩu (tối thiểu 8 ký tự)" autocomplete="current-password">
+      <input id="password" type="password" placeholder="Mật khẩu (đăng ký mới: tối thiểu 8 ký tự)" autocomplete="current-password">
       <input id="display-name" type="text" placeholder="Tên hiển thị khi đăng ký" autocomplete="name">
       <button id="login" type="button">Đăng nhập</button>
       <button id="register" class="secondary" type="button">Đăng ký</button>
@@ -90,7 +90,14 @@
     if (token) headers.set("Authorization", `Bearer ${token}`);
     const response = await fetch(path, {...options, headers});
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.detail || "Request thất bại");
+    if (!response.ok) {
+      const detail = Array.isArray(data.detail)
+        ? data.detail.map((item) => item.msg || item.message || JSON.stringify(item)).join("; ")
+        : typeof data.detail === "object"
+          ? JSON.stringify(data.detail)
+          : data.detail;
+      throw new Error(detail || "Request thất bại");
+    }
     return data;
   }
   function setAuthenticated(user) {

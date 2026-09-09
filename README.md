@@ -131,6 +131,15 @@ curl -X POST http://localhost:8000/chat \
 `retrieve_only=true` phù hợp để test permission mà không gọi LLM generate. Không
 gửi `allowed_classification_ids` từ client; server chỉ dùng classification lấy từ DB.
 
+### Trang quản trị quyền
+
+Mở http://localhost:8000/admin và đăng nhập bằng tài khoản có role admin.
+Trang này hiển thị user hiện có và cho phép đặt role staff hoặc manager.
+Việc kiểm tra admin được thực hiện ở cả UI và API; các endpoint
+GET /auth/users và PUT /auth/users/{user_id}/role đều từ chối user không
+có role admin. Role admin hiện tại không bị thu hồi khi đặt lại
+staff/manager từ trang này.
+
 Các model được pull lúc build nên lần đầu có thể mất vài phút và cần khoảng 6GB dung lượng. Compose mặc định không ép GPU để chạy được trên Docker Desktop không có GPU; nếu máy có GPU, có thể thêm device reservation theo hướng dẫn trong lab.
 
 ## Kiểm tra trực tiếp

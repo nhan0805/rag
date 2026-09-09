@@ -13,6 +13,7 @@ from api.routes_upload import router as upload_router
 
 
 UI_PATH = Path(__file__).resolve().parents[1] / "ui" / "index.html"
+ADMIN_UI_PATH = Path(__file__).resolve().parents[1] / "ui" / "admin.html"
 
 app = FastAPI(title="Session 4 RAG", version="1.0.0")
 app.include_router(auth_router)
@@ -25,6 +26,11 @@ app.include_router(chat_router)
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(UI_PATH)
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_index() -> FileResponse:
+    return FileResponse(ADMIN_UI_PATH)
 
 
 @app.get("/health")

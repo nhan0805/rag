@@ -46,6 +46,26 @@ class AuthResponse(BaseModel):
     user: UserResponse
 
 
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    display_name: str | None
+    is_active: bool
+    roles: list[str]
+
+
+class SetRoleRequest(BaseModel):
+    role: str = Field(min_length=1, max_length=32)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"staff", "manager"}:
+            raise ValueError("Role được phép đặt từ UI: staff hoặc manager")
+        return normalized
+
+
 def _response(user: CurrentUser) -> UserResponse:
     return UserResponse(
         id=str(user.id),
@@ -123,6 +143,68 @@ def login(request: Credentials) -> AuthResponse:
 @router.get("/me", response_model=UserResponse)
 def me(user: CurrentUser = Depends(get_current_user)) -> UserResponse:
     return _response(user)
+
+
+@router.get("/users", response_model=list[AdminUserResponse])
+def list_users(_: CurrentUser = Depends(require_admin)) -> list[AdminUserResponse]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                u.id,
+                u.email,
+                u.display_name,
+                u.is_active,
+                COALESCE(
+                    array_agg(r.name ORDER BY r.name)
+                    FILTER (WHERE r.name IS NOT NULL),
+                    ARRAY[]::text[]
+                ) AS roles
+            FROM app_users u
+            LEFT JOIN app_user_roles ur
+              ON ur.user_id = u.id
+             AND NOW() >= ur.valid_from
+             AND (ur.valid_to IS NULL OR ur.valid_to > NOW())
+            LEFT JOIN rag_roles r ON r.id = ur.role_id
+            GROUP BY u.id, u.email, u.display_name, u.is_active
+            ORDER BY LOWER(u.email)
+            """
+        ).fetchall()
+    return [
+        AdminUserResponse(
+            id=str(row[0]),
+            email=row[1],
+            display_name=row[2],
+            is_active=row[3],
+            roles=list(row[4] or []),
+        )
+        for row in rows
+    ]
+
+
+@router.put("/users/{user_id}/role")
+def set_role(
+    user_id: UUID,
+    request: SetRoleRequest,
+    _: CurrentUser = Depends(require_admin),
+) -> dict[str, object]:
+    with get_connection() as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM app_users WHERE id = %s",
+            (user_id,),
+        ).fetchone()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy user")
+
+    # The admin page exposes staff/manager as a mutually exclusive choice.
+    # Existing admin access is intentionally preserved.
+    revoke_role(user_id, "staff")
+    revoke_role(user_id, "manager")
+    try:
+        changed = grant_role(user_id, request.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"user_id": str(user_id), "role": request.role, "changed": changed}
 
 
 @router.post("/users/{user_id}/roles/{role_name}")

@@ -17,6 +17,7 @@
     .auth input, .auth select, .upload select { border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:7px; padding:8px 9px; }
     .auth button.secondary { background:#263451; color:var(--text); }
     .auth-status { color:var(--muted); flex:1 1 240px; }
+    .auth-role { color:#082017; background:var(--accent); border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; }
     .controls { display:flex; gap:18px; flex-wrap:wrap; padding:14px 0 4px; color:var(--muted); font-size:13px; }
     .controls label { cursor:pointer; user-select:none; }
     .controls input { accent-color:var(--accent); vertical-align:-2px; }
@@ -53,6 +54,8 @@
       <button id="login" type="button">Đăng nhập</button>
       <button id="register" class="secondary" type="button">Đăng ký</button>
       <button id="logout" class="secondary" type="button" hidden>Đăng xuất</button>
+      <a id="admin-link" href="/admin" hidden>Quản trị quyền</a>
+      <span id="user-role" class="auth-role" hidden></span>
       <span id="auth-status" class="auth-status">Chưa đăng nhập.</span>
     </div>
     <div class="upload">
@@ -85,6 +88,13 @@
   $("conversation-id").value = storedConversation;
   localStorage.setItem("rag-conversation-id", storedConversation);
   const setBusy = (busy) => { $("upload").disabled = busy; $("send").disabled = busy; };
+  function resetChatSession() {
+    const conversationId = crypto.randomUUID();
+    $("conversation-id").value = conversationId;
+    localStorage.setItem("rag-conversation-id", conversationId);
+    $("messages").replaceChildren();
+    $("question").value = "";
+  }
   async function api(path, options = {}) {
     const headers = new Headers(options.headers || {});
     if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -101,15 +111,25 @@
     return data;
   }
   function setAuthenticated(user) {
+    const previousUserId = localStorage.getItem("rag-session-user-id");
+    if (previousUserId && previousUserId !== user.id) resetChatSession();
+    localStorage.setItem("rag-session-user-id", user.id);
     const names = (user.classifications || []).map((item) => item.name);
+    const roles = user.roles || [];
     $("auth-status").textContent = `${user.email} · role=${(user.roles || []).join(",") || "none"}`;
     $("login").hidden = true; $("register").hidden = true; $("logout").hidden = false;
+    $("admin-link").hidden = !roles.includes("admin");
+    $("user-role").textContent = "Role: " + (roles.join(", ") || "none");
+    $("user-role").hidden = false;
     $("classification").replaceChildren(...names.map((name) => { const option = document.createElement("option"); option.value = name; option.textContent = name; return option; }));
     $("upload").disabled = false; $("send").disabled = false;
   }
   function setLoggedOut(message = "Chưa đăng nhập.") {
     token = ""; localStorage.removeItem("rag-access-token");
+    localStorage.removeItem("rag-session-user-id");
+    resetChatSession();
     $("auth-status").textContent = message; $("login").hidden = false; $("register").hidden = false; $("logout").hidden = true;
+    $("admin-link").hidden = true; $("user-role").hidden = true;
     $("classification").replaceChildren(); $("upload").disabled = true; $("send").disabled = true;
   }
   async function refreshDocuments() {

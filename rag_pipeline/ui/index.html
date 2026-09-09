@@ -124,6 +124,9 @@
     try {
       const data = await api(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email:$('email').value.trim(), password:$('password').value, display_name:$('display-name').value.trim() || null})});
       token = data.access_token; localStorage.setItem("rag-access-token", token); setAuthenticated(data.user); await refreshDocuments();
+      $("auth-status").textContent = path === "/auth/register"
+        ? `Đăng ký thành công: ${data.user.email}`
+        : `Đăng nhập thành công: ${data.user.email}`;
     } catch (error) { $("auth-status").textContent = error.message; }
   }
   $("login").onclick = () => authenticate("/auth/login");

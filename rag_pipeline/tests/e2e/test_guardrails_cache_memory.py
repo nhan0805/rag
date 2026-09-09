@@ -3,6 +3,8 @@ import os
 import unittest
 from urllib.request import Request, urlopen
 
+from tests.e2e.auth import auth_headers
+
 
 RUN_E2E = os.getenv("RUN_RAG_E2E") == "1"
 
@@ -11,12 +13,16 @@ RUN_E2E = os.getenv("RUN_RAG_E2E") == "1"
 class GuardrailCacheMemoryE2ETests(unittest.TestCase):
     base_url = os.getenv("RAG_EVAL_URL", "http://localhost:8000")
 
-    def post_chat(self, payload: dict) -> dict:
+    @classmethod
+    def setUpClass(cls):
+        cls.headers = auth_headers(cls.base_url)
+
+    def post_chat(self, payload: dict, headers: dict[str, str] | None = None) -> dict:
         body = json.dumps(payload).encode("utf-8")
         request = Request(
             f"{self.base_url}/chat",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={**(headers or self.headers), "Content-Type": "application/json"},
             method="POST",
         )
         with urlopen(request, timeout=180) as response:
@@ -50,13 +56,17 @@ class GuardrailCacheMemoryE2ETests(unittest.TestCase):
                 "user_id": "memory-a",
             }
         )
+        other_token = os.getenv("RAG_EVAL_OTHER_TOKEN", "")
+        if not other_token:
+            self.skipTest("Set RAG_EVAL_OTHER_TOKEN to test cross-user memory isolation")
         other_user = self.post_chat(
             {
                 "question": "Thế còn điều kiện?",
                 "retrieve_only": True,
                 "conversation_id": conversation_id,
                 "user_id": "memory-b",
-            }
+            },
+            headers={"Authorization": f"Bearer {other_token}"},
         )
         self.assertTrue(first["sources"])
         self.assertEqual(follow_up["sources"][0]["source"], "lam-viec-tu-xa.md")

@@ -6,7 +6,7 @@ from typing import TypedDict
 from config.env_config import settings
 from guardrails import GuardVerdict, check_answer, check_question, check_retrieval
 from memory.contextualise import contextualise
-from memory.store import append_turn, recent_turns
+from memory.store import append_turn, log_memory_event, recent_turns
 from retrieval.cache.key import scope_key
 from retrieval.cache.store import lookup as cache_lookup
 from retrieval.cache.store import save as cache_save
@@ -94,14 +94,30 @@ def _guard_question_node(state: RAGState) -> None:
 
 def _contextualise_node(state: RAGState) -> None:
     conversation_id = state.get("conversation_id")
-    if not settings.memory_enabled or not conversation_id:
+    if not settings.memory_enabled:
+        log_memory_event("skip", reason="disabled")
         return
+    if not conversation_id:
+        log_memory_event("skip", reason="no_conversation")
+        return
+    original_question = state["question"]
+    user_id = state.get("user_id", "anonymous")
     history = recent_turns(
         conversation_id,
-        state.get("user_id", "anonymous"),
+        user_id,
         n=settings.memory_turns,
     )
-    state["question"] = contextualise(state["question"], history)
+    state["question"] = contextualise(original_question, history)
+    log_memory_event(
+        "context",
+        conversation_id,
+        user_id,
+        turns=len(history),
+        changed=int(state["question"] != original_question),
+        question_chars=len(original_question),
+        input_question=original_question,
+        contextualized_question=state["question"],
+    )
 
 
 def _embed_question_node(state: RAGState) -> None:
@@ -133,7 +149,10 @@ def _check_cache_node(state: RAGState) -> dict | None:
 
 def _retrieve_node(state: RAGState) -> None:
     allowed_ids = state.get("allowed_classification_ids", [])
-    common = {"allowed_classification_ids": allowed_ids} if allowed_ids else {}
+    # Authenticated HTTP calls always carry a list, including an empty list
+    # (fail closed).  The None path keeps pure graph unit tests independent of
+    # PostgreSQL; it is never used by the API dependency.
+    common = {"allowed_classification_ids": allowed_ids} if allowed_ids is not None else {}
     if state["rerank"] or state["hybrid"]:
         fetch_k = max(settings.retrieve_fetch_k, settings.rerank_top_n)
         chunks = top_k_chunks(
@@ -159,7 +178,7 @@ def _lexical_search_node(state: RAGState) -> None:
         state["lexical_chunks"] = []
         return
     allowed_ids = state.get("allowed_classification_ids", [])
-    if allowed_ids:
+    if allowed_ids is not None:
         state["lexical_chunks"] = lexical_search(
             state["question"], limit=settings.lexical_fetch_k,
             allowed_classification_ids=allowed_ids,
@@ -279,20 +298,31 @@ def _store_cache_node(state: RAGState) -> None:
 
 def _store_memory_node(state: RAGState) -> None:
     conversation_id = state.get("conversation_id")
-    if (
-        not settings.memory_enabled
-        or not conversation_id
-        or state.get("blocked")
-    ):
+    user_id = state.get("user_id", "anonymous")
+    if not settings.memory_enabled:
+        log_memory_event("skip", reason="disabled")
+        return
+    if not conversation_id:
+        log_memory_event("skip", reason="no_conversation", user_id=user_id)
+        return
+    if state.get("blocked"):
+        log_memory_event("skip", conversation_id, user_id, reason="blocked")
         return
     try:
         append_turn(
             conversation_id,
-            state.get("user_id", "anonymous"),
+            user_id,
             state["question"],
             state.get("answer", ""),
         )
     except Exception as exc:
+        log_memory_event(
+            "error",
+            conversation_id,
+            user_id,
+            operation="write",
+            error_type=type(exc).__name__,
+        )
         logger.warning("Memory save skipped: %s", exc)
 
 
@@ -313,9 +343,11 @@ def run_graph(
         "hybrid": _with_hybrid_flag(hybrid),
         "hybrid_used": False,
         "retrieve_only": retrieve_only,
-        "allowed_classification_ids": [
-            str(value) for value in (allowed_classification_ids or [])
-        ],
+        "allowed_classification_ids": (
+            None
+            if allowed_classification_ids is None
+            else [str(value) for value in allowed_classification_ids]
+        ),
         "user_id": user_id,
         "conversation_id": conversation_id,
         "blocked": False,

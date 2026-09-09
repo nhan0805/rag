@@ -9,9 +9,9 @@ from retrieval.hybrid.query_builder import build_tsquery
 
 def lexical_search(
     question: str,
+    allowed_classification_ids: Sequence[str],
     limit: int | None = None,
     fetch_k: int | None = None,
-    allowed_classification_ids: Sequence[str] | None = None,
 ) -> list[dict]:
     """Find chunks using PostgreSQL full-text search and ``ts_rank``.
 
@@ -19,7 +19,7 @@ def lexical_search(
     meaningful terms, which lets exact identifiers rescue vector misses.
     """
     tsquery = build_tsquery(question)
-    if not tsquery:
+    if not tsquery or not allowed_classification_ids:
         return []
 
     if limit is not None and fetch_k is not None:
@@ -34,11 +34,8 @@ def lexical_search(
         return []
 
     config = settings.text_search_config
-    classification_clause = ""
-    params: list[object] = [config, tsquery]
-    if allowed_classification_ids:
-        classification_clause = "AND d.classification_id = ANY(%s)"
-        params.append(list(allowed_classification_ids))
+    classification_clause = "AND d.classification_id = ANY(%s::uuid[])"
+    params: list[object] = [config, tsquery, list(allowed_classification_ids)]
     params.append(fetch_limit)
     with get_connection() as conn:
         rows = conn.execute(

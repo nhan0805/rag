@@ -3,6 +3,8 @@ import os
 import unittest
 from urllib.request import Request, urlopen
 
+from tests.e2e.auth import auth_headers
+
 
 RUN_CALIBRATION = os.getenv("CALIBRATE") == "1"
 
@@ -10,6 +12,10 @@ RUN_CALIBRATION = os.getenv("CALIBRATE") == "1"
 @unittest.skipUnless(RUN_CALIBRATION, "Set CALIBRATE=1 to print calibration distributions")
 class CalibrationE2ETests(unittest.TestCase):
     base_url = os.getenv("RAG_EVAL_URL", "http://localhost:8000")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.headers = auth_headers(cls.base_url)
 
     def test_print_fixture_score_distribution(self):
         # This tool deliberately reports observations; it does not choose a
@@ -28,7 +34,7 @@ class CalibrationE2ETests(unittest.TestCase):
             request = Request(
                 f"{self.base_url}/chat",
                 data=body,
-                headers={"Content-Type": "application/json"},
+                headers={**self.headers, "Content-Type": "application/json"},
                 method="POST",
             )
             with urlopen(request, timeout=180) as response:

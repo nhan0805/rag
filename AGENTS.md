@@ -8,6 +8,11 @@
   latest `main`.
 - Push the feature branch, open a PR targeting `main`, and report the PR URL.
 - Do not merge the PR unless the user explicitly asks for the merge.
+- When the user says deploy for this repository, interpret it as committing
+  the requested changes, pushing the feature branch to GitHub, creating or
+  updating a PR targeting main, and enabling squash auto-merge so it merges
+  after required checks pass. Never push directly to main; if checks fail,
+  report the blocker instead of forcing a merge.
 - Keep local-only configuration, credentials, and logs out of commits. In
   particular, never commit `.env.rag`, `.env.pgvector`, or files under
   `rag_pipeline/logs/`.

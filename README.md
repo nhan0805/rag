@@ -11,7 +11,7 @@ docker compose up -d --build
 docker compose logs -f rag-app
 ```
 
-Mở [http://localhost:8000](http://localhost:8000), chọn file Markdown rồi bấm **Upload & Index**.
+Mở [http://localhost:8000](http://localhost:8000), đăng ký/đăng nhập, chọn classification rồi bấm **Upload & Index**.
 
 UI có toggle **Bật hybrid search** và **Bật rerank**. Khi bật hybrid, hệ thống lấy
 ứng viên từ vector và PostgreSQL full-text rồi hợp nhất bằng Reciprocal Rank Fusion
@@ -64,22 +64,89 @@ xóa. Chỉ câu trả lời có `document_id` mới được lưu. Có thể d�
 curl -X POST 'http://localhost:8000/eval/cache/purge?expired_only=true'
 ```
 
-Memory bật với `MEMORY_ENABLED=true`; gửi thêm `conversation_id` và `user_id`
-trong `/chat` để câu hỏi phụ thuộc lượt trước được bổ ngữ cảnh. Lịch sử luôn
-được lọc theo cả hai trường này.
+Memory bật với `MEMORY_ENABLED=true`; UI giữ `conversation_id` để câu hỏi phụ
+thuộc lượt trước được bổ ngữ cảnh. Quyền đọc của `/chat` không lấy từ body mà
+được đọc mới từ DB theo token ở từng request.
+
+Memory telemetry được ghi riêng vào `rag_pipeline/logs/memory.log` khi bật
+`MEMORY_LOG_ENABLED=true`:
+
+```bash
+tail -f rag_pipeline/logs/memory.log
+```
+
+Log có các event `memory_read`, `memory_context`, `memory_write` và
+`memory_skip`. Conversation/user được hash; câu hỏi và câu trả lời không ghi
+nguyên văn, chỉ có số ký tự và trạng thái contextualise.
+
+Khi cần debug input memory ở local, bật `MEMORY_LOG_QUESTION=true`. Khi đó
+`memory_context` sẽ ghi `input_question` và
+`contextualized_question`; không bật tùy chọn này khi chia sẻ log vì câu hỏi
+có thể chứa PII.
+
+## Lab 4 — permissions và vòng đời tài liệu
+
+Schema tạo `rag_classifications`, `rag_roles`, `rag_role_classifications` và
+`app_user_roles`. Quyền đọc được tính theo `user → role → classification` và
+lọc trực tiếp trong cả nhánh vector lẫn full-text. JWT chỉ chứa định danh user;
+thu hồi role có hiệu lực ở request kế tiếp. Admin chỉ được bootstrap từ biến môi
+trường, không có mật khẩu trong SQL hoặc git:
+
+```dotenv
+ADMIN_EMAIL=admin@rag.local
+ADMIN_PASSWORD=<đặt local, không commit>
+ADMIN_ROLE=admin
+DEFAULT_ROLE=staff
+DEFAULT_CLASSIFICATION=A
+JWT_SECRET=<chuỗi random local>
+JWT_EXPIRES_MIN=720
+QA_AWARE_CHUNKING=true
+```
+
+Upload cần classification và chỉ hiển thị nhãn người dùng được ghi. `POST
+/reindex` giữ classification/created_by cũ. Hash SHA-256 của text đã parse giúp
+upload lại không đổi trả `status=unchanged`, còn nội dung đổi hoặc document mất
+chunk sẽ index lại. UI liệt kê hash rút gọn, số chunk và nút xoá; xoá dùng 404
+cho cả tài liệu không tồn tại lẫn tài liệu ngoài quyền và dọn cả file trong
+`input/`.
+
+Ví dụ test nhanh sau khi stack chạy:
+
+```bash
+TOKEN=$(curl -sS -X POST http://localhost:8000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"staff@example.local","password":"local-password-123"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/upload/classifications
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/documents
+curl -X POST http://localhost:8000/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F classification=A -F file=@input/corrector-agents.md
+curl -X POST http://localhost:8000/chat \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"question":"Corrector agent để làm gì?","hybrid":true,"retrieve_only":true}'
+```
+
+`retrieve_only=true` phù hợp để test permission mà không gọi LLM generate. Không
+gửi `allowed_classification_ids` từ client; server chỉ dùng classification lấy từ DB.
+
+### Trang quản trị quyền
+
+Mở http://localhost:8000/admin và đăng nhập bằng tài khoản có role admin.
+Trang này hiển thị user hiện có và cho phép đặt role staff hoặc manager.
+Việc kiểm tra admin được thực hiện ở cả UI và API; các endpoint
+GET /auth/users và PUT /auth/users/{user_id}/role đều từ chối user không
+có role admin. Role admin hiện tại không bị thu hồi khi đặt lại
+staff/manager từ trang này.
 
 Các model được pull lúc build nên lần đầu có thể mất vài phút và cần khoảng 6GB dung lượng. Compose mặc định không ép GPU để chạy được trên Docker Desktop không có GPU; nếu máy có GPU, có thể thêm device reservation theo hướng dẫn trong lab.
 
 ## Kiểm tra trực tiếp
 
 ```bash
-curl -F "file=@input/corrector-agents.md" http://localhost:8000/upload
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Corrector agent để làm gì?"}'
-
 # Hoặc index lại toàn bộ input/
-curl -X POST http://localhost:8000/reindex
+curl -X POST http://localhost:8000/reindex -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 Kiểm tra số bản ghi:
@@ -94,7 +161,7 @@ docker exec -it pgvector psql -U ai_user -d ai_db \
 Đo 4 cấu hình baseline, rerank, hybrid và hybrid+rerank bằng golden set:
 
 ```bash
-python eval/run_eval.py
+RAG_EVAL_EMAIL=admin@rag.local RAG_EVAL_PASSWORD='<local-password>' python eval/run_eval.py
 ```
 
 Bộ đo tách riêng `recall/mrr`, `refusal_rate`, `block_rate` và
@@ -109,9 +176,9 @@ python -m unittest discover -s tests -v
 
 ## Cấu trúc chính
 
-- `indexing/`: process 1, đọc Markdown, tách frontmatter, chunk fixed-token 800/120, gọi nomic và lưu DB.
+- `indexing/`: đọc Markdown, hash nội dung, chunk fixed-token hoặc QA-aware, gọi nomic và lưu DB.
 - `retrieval/`: embed câu hỏi, tìm vector/full-text, RRF, rerank, dựng prompt và gọi llama3.2:3b.
 - `retrieval/rerank/`: registry + policy dùng chung + backend FlashRank/LLM.
 - `retrieval/hybrid/`: query builder, lexical search và RRF fusion.
-- `api/`: `/upload`, `/chat`, `/health` và `GET /` phục vụ UI.
-- `sql/init_rag_db.sql`: schema idempotent cho documents, chunks và embeddings.
+- `api/`: auth, `/upload`, `/documents`, `/chat`, `/eval/run`, `/health` và `GET /` phục vụ UI.
+- `sql/init_rag_db.sql` + các migration đánh số: schema documents, permissions, hash và embeddings.

@@ -9,15 +9,23 @@ from config.env_config import settings
 
 SQL_PATH = Path(__file__).resolve().parent / "sql" / "init_rag_db.sql"
 HYBRID_SQL_PATH = Path(__file__).resolve().parent / "sql" / "03_hybrid_search.sql"
+MIGRATION_DIR = Path(__file__).resolve().parent / "sql"
 
 
 def rendered_schema() -> str:
     sql = SQL_PATH.read_text(encoding="utf-8")
     hybrid_sql = HYBRID_SQL_PATH.read_text(encoding="utf-8")
+    follow_up = "\n\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted(MIGRATION_DIR.glob("[0-9][0-9]_*.sql"))
+        if path.name not in {SQL_PATH.name, HYBRID_SQL_PATH.name}
+    )
     return (
         sql.replace("{{EMBEDDING_DIM}}", str(settings.embedding_dim))
         + "\n\n"
         + hybrid_sql
+        + "\n\n"
+        + follow_up
     )
 
 

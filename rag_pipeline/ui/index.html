@@ -13,6 +13,11 @@
     .subtitle { margin:0 0 28px; color:var(--muted); }
     .panel { background:rgba(18,26,43,.9); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 18px 50px #0003; }
     .upload { display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:18px; }
+    .auth { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--line); }
+    .auth input, .auth select, .upload select { border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:7px; padding:8px 9px; }
+    .auth button.secondary { background:#263451; color:var(--text); }
+    .auth-status { color:var(--muted); flex:1 1 240px; }
+    .auth-role { color:#082017; background:var(--accent); border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; }
     .controls { display:flex; gap:18px; flex-wrap:wrap; padding:14px 0 4px; color:var(--muted); font-size:13px; }
     .controls label { cursor:pointer; user-select:none; }
     .controls input { accent-color:var(--accent); vertical-align:-2px; }
@@ -29,6 +34,9 @@
     .sources { margin-top:10px; color:var(--muted); font-size:13px; }
     .source-line { margin-top:4px; }
     .cache-meta { margin-top:10px; color:var(--muted); font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .documents { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; color:var(--muted); font-size:13px; }
+    .document-row { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid #1b2740; }
+    .document-row button { padding:5px 9px; background:#ef8f8f; color:#301010; font-size:12px; }
     form.chat { display:flex; gap:10px; margin-top:8px; }
     form.chat input { flex:1; min-width:0; border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:10px; padding:12px 13px; font:inherit; }
     @media (max-width:600px) { main { width:calc(100% - 20px); padding-top:22px; } form.chat { flex-direction:column; } .message.user,.message.assistant { margin-left:0; margin-right:0; } }
@@ -39,8 +47,20 @@
   <h1>Local RAG</h1>
   <p class="subtitle">Upload Markdown để indexing, sau đó hỏi trên kho tài liệu.</p>
   <section class="panel">
+    <div id="auth" class="auth">
+      <input id="email" type="email" placeholder="Email" autocomplete="username">
+      <input id="password" type="password" placeholder="Mật khẩu (đăng ký mới: tối thiểu 8 ký tự)" autocomplete="current-password">
+      <input id="display-name" type="text" placeholder="Tên hiển thị khi đăng ký" autocomplete="name">
+      <button id="login" type="button">Đăng nhập</button>
+      <button id="register" class="secondary" type="button">Đăng ký</button>
+      <button id="logout" class="secondary" type="button" hidden>Đăng xuất</button>
+      <a id="admin-link" href="/admin" hidden>Quản trị quyền</a>
+      <span id="user-role" class="auth-role" hidden></span>
+      <span id="auth-status" class="auth-status">Chưa đăng nhập.</span>
+    </div>
     <div class="upload">
       <input id="file" type="file" accept=".md,text/markdown">
+      <select id="classification" aria-label="Classification"></select>
       <button id="upload" type="button">Upload &amp; Index</button>
       <span id="status" class="status"></span>
     </div>
@@ -49,21 +69,96 @@
       <label><input id="rerank" type="checkbox" checked> Bật rerank</label>
       <label><input id="show-sources" type="checkbox" checked> Hiện nguồn</label>
       <label>Conversation <input id="conversation-id" type="text" autocomplete="off"></label>
-      <label>User <input id="user-id" type="text" value="anonymous" autocomplete="off"></label>
     </div>
     <div id="messages" aria-live="polite"></div>
     <form id="chat" class="chat">
       <input id="question" autocomplete="off" placeholder="Ví dụ: Corrector agent để làm gì?" required>
       <button id="send" type="submit">Gửi</button>
     </form>
+    <div class="documents">
+      <strong>Tài liệu đã index</strong>
+      <div id="documents-list">Đăng nhập để xem.</div>
+    </div>
   </section>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
+  let token = localStorage.getItem("rag-access-token") || "";
   const storedConversation = localStorage.getItem("rag-conversation-id") || crypto.randomUUID();
   $("conversation-id").value = storedConversation;
   localStorage.setItem("rag-conversation-id", storedConversation);
   const setBusy = (busy) => { $("upload").disabled = busy; $("send").disabled = busy; };
+  function resetChatSession() {
+    const conversationId = crypto.randomUUID();
+    $("conversation-id").value = conversationId;
+    localStorage.setItem("rag-conversation-id", conversationId);
+    $("messages").replaceChildren();
+    $("question").value = "";
+  }
+  async function api(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(path, {...options, headers});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = Array.isArray(data.detail)
+        ? data.detail.map((item) => item.msg || item.message || JSON.stringify(item)).join("; ")
+        : typeof data.detail === "object"
+          ? JSON.stringify(data.detail)
+          : data.detail;
+      throw new Error(detail || "Request thất bại");
+    }
+    return data;
+  }
+  function setAuthenticated(user) {
+    const previousUserId = localStorage.getItem("rag-session-user-id");
+    if (previousUserId && previousUserId !== user.id) resetChatSession();
+    localStorage.setItem("rag-session-user-id", user.id);
+    const names = (user.classifications || []).map((item) => item.name);
+    const roles = user.roles || [];
+    $("auth-status").textContent = `${user.email} · role=${(user.roles || []).join(",") || "none"}`;
+    $("login").hidden = true; $("register").hidden = true; $("logout").hidden = false;
+    $("admin-link").hidden = !roles.includes("admin");
+    $("user-role").textContent = "Role: " + (roles.join(", ") || "none");
+    $("user-role").hidden = false;
+    $("classification").replaceChildren(...names.map((name) => { const option = document.createElement("option"); option.value = name; option.textContent = name; return option; }));
+    $("upload").disabled = false; $("send").disabled = false;
+  }
+  function setLoggedOut(message = "Chưa đăng nhập.") {
+    token = ""; localStorage.removeItem("rag-access-token");
+    localStorage.removeItem("rag-session-user-id");
+    resetChatSession();
+    $("auth-status").textContent = message; $("login").hidden = false; $("register").hidden = false; $("logout").hidden = true;
+    $("admin-link").hidden = true; $("user-role").hidden = true;
+    $("classification").replaceChildren(); $("upload").disabled = true; $("send").disabled = true;
+  }
+  async function refreshDocuments() {
+    if (!token) return;
+    try {
+      const data = await api("/documents");
+      const list = $("documents-list"); list.replaceChildren();
+      if (!data.length) { list.textContent = "Chưa có tài liệu trong quyền đọc."; return; }
+      data.forEach((item) => {
+        const row = document.createElement("div"); row.className = "document-row";
+        const label = document.createElement("span"); label.textContent = `${item.source_path} · ${item.classification} · ${item.chunk_count} chunks · sha256=${item.content_sha256}`;
+        const remove = document.createElement("button"); remove.textContent = "Xoá";
+        remove.onclick = async () => { if (!confirm(`Xoá ${item.source_path}?`)) return; try { await api(`/documents/${item.id}`, {method:"DELETE"}); await refreshDocuments(); } catch (error) { $("status").textContent = error.message; } };
+        row.append(label, remove); list.append(row);
+      });
+    } catch (error) { $("documents-list").textContent = error.message; }
+  }
+  async function authenticate(path) {
+    try {
+      const data = await api(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email:$('email').value.trim(), password:$('password').value, display_name:$('display-name').value.trim() || null})});
+      token = data.access_token; localStorage.setItem("rag-access-token", token); setAuthenticated(data.user); await refreshDocuments();
+      $("auth-status").textContent = path === "/auth/register"
+        ? `Đăng ký thành công: ${data.user.email}`
+        : `Đăng nhập thành công: ${data.user.email}`;
+    } catch (error) { $("auth-status").textContent = error.message; }
+  }
+  $("login").onclick = () => authenticate("/auth/login");
+  $("register").onclick = () => authenticate("/auth/register");
+  $("logout").onclick = () => setLoggedOut("Đã đăng xuất.");
   function addMessage(kind, text, sources = [], metadata = null) {
     const box = document.createElement("div");
     box.className = `message ${kind}`;
@@ -117,11 +212,10 @@
     if (!file) { $("status").textContent = "Hãy chọn một file .md trước."; return; }
     setBusy(true); $("status").textContent = "Đang upload và index…";
     try {
-      const form = new FormData(); form.append("file", file);
-      const response = await fetch("/upload", { method:"POST", body:form });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Upload thất bại");
-      $("status").textContent = `Đã nạp ${data.filename} — ${data.chunks_indexed} chunk.`;
+      const form = new FormData(); form.append("file", file); form.append("classification", $("classification").value);
+      const data = await api("/upload", { method:"POST", body:form });
+      $("status").textContent = `Đã nạp ${data.filename} — status=${data.status}, ${data.chunks_indexed} chunk.`;
+      await refreshDocuments();
     } catch (error) { $("status").textContent = error.message; }
     finally { setBusy(false); }
   };
@@ -131,9 +225,7 @@
     if (!question) return;
     addMessage("user", question); $("question").value = ""; setBusy(true);
     try {
-      const response = await fetch("/chat", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({question, hybrid:$("hybrid").checked, rerank:$("rerank").checked, show_sources:$("show-sources").checked, conversation_id:$("conversation-id").value.trim() || null, user_id:$("user-id").value.trim() || "anonymous"}) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Chat thất bại");
+      const data = await api("/chat", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({question, hybrid:$("hybrid").checked, rerank:$("rerank").checked, show_sources:$("show-sources").checked, conversation_id:$("conversation-id").value.trim() || null}) });
       addMessage("assistant", data.answer, data.sources || [], {
         cache_hit: data.cache_hit,
         cache_similarity: data.cache_similarity,
@@ -141,6 +233,11 @@
     } catch (error) { addMessage("assistant", `Lỗi: ${error.message}`); }
     finally { setBusy(false); }
   };
+  (async () => {
+    if (!token) { setLoggedOut(); return; }
+    try { setAuthenticated(await api("/auth/me")); await refreshDocuments(); }
+    catch (_) { setLoggedOut("Phiên đăng nhập hết hạn."); }
+  })();
 </script>
 </body>
 </html>

@@ -9,16 +9,18 @@ from indexing.step8_store_chunks import vector_literal
 
 def top_k_chunks(
     question_embedding: Sequence[float],
+    allowed_classification_ids: Sequence[str],
     top_k: int | None = None,
     fetch_k: int | None = None,
     similarity_threshold: float | None = None,
-    allowed_classification_ids: Sequence[str] | None = None,
 ) -> list[dict]:
     """Retrieve candidates in vector order and preserve their original rank.
 
     ``fetch_k`` is intentionally separate from ``top_k``: reranking needs a
     larger candidate pool, while the non-reranked path keeps the old behavior.
     """
+    if not allowed_classification_ids:
+        return []
     limit = fetch_k if fetch_k is not None else (top_k if top_k is not None else settings.top_k)
     if limit <= 0:
         return []
@@ -29,11 +31,8 @@ def top_k_chunks(
         if similarity_threshold is None
         else similarity_threshold
     )
-    clauses: list[str] = []
-    params: list[object] = [embedding]
-    if allowed_classification_ids:
-        clauses.append("d.classification_id = ANY(%s)")
-        params.append(list(allowed_classification_ids))
+    clauses: list[str] = ["d.classification_id = ANY(%s::uuid[])"]
+    params: list[object] = [embedding, list(allowed_classification_ids)]
     if threshold > 0:
         clauses.append("1 - (e.embedding <=> %s::vector) >= %s")
         params.extend([embedding, threshold])

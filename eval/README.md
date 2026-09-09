@@ -5,7 +5,7 @@ full-text trên mã lỗi. Script gọi `/chat` với `retrieve_only=true`, vì 
 được thứ hạng ổn định mà không bị ảnh hưởng bởi câu trả lời của LLM.
 
 ```bash
-python eval/run_eval.py
+RAG_EVAL_EMAIL=admin@rag.local RAG_EVAL_PASSWORD='<local-password>' python eval/run_eval.py
 ```
 
 Có thể đổi URL hoặc số câu:

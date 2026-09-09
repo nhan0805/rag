@@ -1,9 +1,36 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from config.db_connection import get_connection
 from config.env_config import settings
+from shared.logger import memory_file_logger
+
+
+def _fingerprint(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+
+def log_memory_event(
+    event: str,
+    conversation_id: str | None = None,
+    user_id: str | None = None,
+    **fields: object,
+) -> None:
+    """Write memory telemetry without putting questions/answers in a log file."""
+    safe_fields = {
+        "conversation": _fingerprint(conversation_id) if conversation_id else "none",
+        "user": _fingerprint(user_id) if user_id else "none",
+    }
+    for key, value in fields.items():
+        if key in {"input_question", "contextualized_question"}:
+            if settings.memory_log_question:
+                safe_fields[key] = value
+        else:
+            safe_fields[key] = value
+    details = " ".join(f"{key}={safe_fields[key]}" for key in sorted(safe_fields))
+    memory_file_logger.info("memory_%s %s", event, details)
 
 
 def append_turn(
@@ -21,6 +48,13 @@ def append_turn(
             """,
             (conversation_id, user_id, question, answer),
         )
+    log_memory_event(
+        "write",
+        conversation_id,
+        user_id,
+        question_chars=len(question),
+        answer_chars=len(answer),
+    )
 
 
 def recent_turns(
@@ -42,7 +76,15 @@ def recent_turns(
             """,
             (conversation_id, user_id, limit),
         ).fetchall()
-    return [
+    result = [
         {"question": row[0], "answer": row[1], "created_at": row[2]}
         for row in reversed(rows)
     ]
+    log_memory_event(
+        "read",
+        conversation_id,
+        user_id,
+        turns=len(result),
+        limit=limit,
+    )
+    return result

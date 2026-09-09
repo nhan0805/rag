@@ -5,43 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Quản trị quyền — Local RAG</title>
   <style>
-    :root { color-scheme: dark; --bg:#0b1020; --panel:#121a2b; --line:#263451; --text:#e8eefc; --muted:#91a0bd; --accent:#6ee7b7; --danger:#ef8f8f; }
+    :root { color-scheme:dark; --bg:#080d1b; --panel:#111a2d; --panel-2:#0d1527; --line:#263756; --text:#eef3ff; --muted:#8e9dbb; --accent:#73e3b6; --accent-strong:#b6f5da; --danger:#f29a9a; }
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; background:radial-gradient(circle at top, #182542, var(--bg) 55%); color:var(--text); font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    main { width:min(1050px, calc(100% - 32px)); margin:0 auto; padding:38px 0 48px; }
-    a { color:var(--accent); }
-    h1 { margin:12px 0 6px; font-size:clamp(26px,5vw,42px); letter-spacing:-.03em; }
-    .subtitle { margin:0 0 28px; color:var(--muted); }
-    .panel { background:rgba(18,26,43,.92); border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:0 18px 50px #0003; }
-    .login-form { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    input, select { border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:8px; padding:10px 11px; font:inherit; }
-    input { min-width:230px; }
-    button { border:0; border-radius:9px; padding:10px 15px; background:var(--accent); color:#082017; font-weight:700; cursor:pointer; }
-    button.secondary { background:#263451; color:var(--text); }
+    [hidden] { display:none !important; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 15% -10%, #1d3157 0, transparent 38%), linear-gradient(145deg, #0a1020, var(--bg) 60%); color:var(--text); font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1080px, calc(100% - 36px)); margin:0 auto; padding:30px 0 44px; }
+    a { color:var(--accent-strong); text-decoration:none; }
+    .hero { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:22px; }
+    .eyebrow { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:5px 0 4px; font-size:clamp(32px,5vw,52px); line-height:1; letter-spacing:-.055em; }
+    .subtitle { margin:0; color:var(--muted); font-size:15px; }
+    .back { font-size:13px; }
+    .hero-mark { display:grid; place-items:center; width:54px; height:54px; border:1px solid #4d7691; border-radius:16px; color:var(--accent-strong); background:#15334a; box-shadow:0 12px 32px #0004; font-weight:900; letter-spacing:-.08em; }
+    .panel { background:rgba(17,26,45,.92); border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 20px 60px #0004; }
+    .section-head, .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .section-label { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    .section-title { margin-top:3px; font-size:16px; font-weight:800; }
+    .login-form { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:9px; align-items:center; margin-top:14px; }
+    input, select { width:100%; border:1px solid var(--line); background:#091224; color:var(--text); border-radius:9px; padding:10px 11px; font:inherit; outline:none; }
+    input:focus, select:focus { border-color:#5b9db0; box-shadow:0 0 0 3px #5b9db022; }
+    button { border:0; border-radius:9px; min-height:38px; padding:0 15px; background:var(--accent); color:#072018; font-weight:800; cursor:pointer; }
+    button.secondary { background:#263654; color:var(--text); }
     button:disabled { opacity:.55; cursor:wait; }
-    .status { color:var(--muted); margin-top:12px; min-height:24px; }
+    .status { color:var(--muted); margin-top:12px; min-height:20px; font-size:12px; }
     .status.error { color:var(--danger); }
-    .toolbar { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:16px; }
+    .session-bar { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
     .identity { color:var(--muted); }
+    #admin-panel { margin-top:12px; }
+    .admin-summary { color:var(--muted); font-size:12px; }
+    .toolbar { margin-bottom:14px; }
     .table-wrap { overflow-x:auto; }
-    table { width:100%; border-collapse:collapse; min-width:680px; }
+    table { width:100%; border-collapse:collapse; min-width:680px; overflow:hidden; }
     th, td { text-align:left; padding:12px 10px; border-bottom:1px solid #1b2740; vertical-align:middle; }
     th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
     td small { display:block; color:var(--muted); overflow-wrap:anywhere; }
-    .role-list { color:var(--accent); font-weight:700; }
+    .role-list { color:var(--accent-strong); font-weight:800; }
     .role-action { display:flex; gap:8px; align-items:center; }
     .role-action select { padding:7px 9px; }
     .empty { color:var(--muted); padding:18px 0; }
-    @media (max-width:600px) { main { width:calc(100% - 20px); padding-top:22px; } input { min-width:0; width:100%; } .login-form button { flex:1; } }
+    @media (max-width:650px) { main { width:calc(100% - 20px); padding-top:22px; } .hero-mark { display:none; } .login-form { grid-template-columns:1fr; } .login-form button { width:100%; } }
   </style>
 </head>
 <body>
 <main>
-  <a href="/">← Về Local RAG</a>
-  <h1>Quản trị quyền</h1>
-  <p class="subtitle">Chỉ tài khoản có role <strong>admin</strong> mới xem và thay đổi quyền user.</p>
+  <header class="hero">
+    <div>
+      <a class="back" href="/">← Về Local RAG</a>
+      <div class="eyebrow">Admin workspace</div>
+      <h1>Quản trị quyền</h1>
+      <p class="subtitle">Quản lý role và phạm vi tài liệu được phép đọc.</p>
+    </div>
+    <div class="hero-mark" aria-hidden="true">A</div>
+  </header>
 
   <section class="panel">
+    <div class="section-head">
+      <div>
+        <div class="section-label">Secure access</div>
+        <div class="section-title">Đăng nhập quản trị</div>
+      </div>
+      <span class="admin-summary">Chỉ role admin được phép tiếp tục</span>
+    </div>
     <form id="login-form" class="login-form">
       <input id="email" type="email" placeholder="Email admin" autocomplete="username" required>
       <input id="password" type="password" placeholder="Mật khẩu" autocomplete="current-password" required>
@@ -56,7 +80,10 @@
 
   <section id="admin-panel" class="panel" hidden>
     <div class="toolbar">
-      <strong>Danh sách user</strong>
+      <div>
+        <div class="section-label">Access control</div>
+        <div class="section-title">Danh sách user</div>
+      </div>
       <button id="refresh" class="secondary" type="button">Làm mới</button>
     </div>
     <div class="table-wrap">

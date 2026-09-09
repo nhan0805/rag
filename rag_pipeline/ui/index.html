@@ -5,78 +5,155 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Session 4 — Local RAG</title>
   <style>
-    :root { color-scheme: dark; --bg:#0b1020; --panel:#121a2b; --line:#263451; --text:#e8eefc; --muted:#91a0bd; --accent:#6ee7b7; --user:#1c3151; }
+    :root { color-scheme: dark; --bg:#080d1b; --panel:#111a2d; --panel-2:#0d1527; --line:#263756; --text:#eef3ff; --muted:#8e9dbb; --accent:#73e3b6; --accent-strong:#b6f5da; --user:#1d3a5d; --danger:#f29a9a; }
     * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; background: radial-gradient(circle at top, #182542, var(--bg) 55%); color:var(--text); font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    main { width:min(920px, calc(100% - 32px)); margin:0 auto; padding:38px 0 48px; }
-    h1 { margin:0 0 6px; font-size:clamp(26px,5vw,42px); letter-spacing:-.03em; }
-    .subtitle { margin:0 0 28px; color:var(--muted); }
-    .panel { background:rgba(18,26,43,.9); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 18px 50px #0003; }
-    .upload { display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:18px; }
-    .auth { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--line); }
-    .auth input, .auth select, .upload select { border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:7px; padding:8px 9px; }
-    .auth button.secondary { background:#263451; color:var(--text); }
-    .auth-status { color:var(--muted); flex:1 1 240px; }
-    .auth-role { color:#082017; background:var(--accent); border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; }
-    .controls { display:flex; gap:18px; flex-wrap:wrap; padding:14px 0 4px; color:var(--muted); font-size:13px; }
-    .controls label { cursor:pointer; user-select:none; }
+    [hidden] { display:none !important; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 15% -10%, #1d3157 0, transparent 38%), linear-gradient(145deg, #0a1020, var(--bg) 60%); color:var(--text); font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1120px, calc(100% - 36px)); margin:0 auto; padding:30px 0 44px; }
+    .hero { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:22px; }
+    .eyebrow, .section-label { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:5px 0 4px; font-size:clamp(32px,5vw,52px); line-height:1; letter-spacing:-.055em; }
+    .subtitle { margin:0; color:var(--muted); font-size:15px; }
+    .hero-mark { display:grid; place-items:center; width:54px; height:54px; border:1px solid #4d7691; border-radius:16px; color:var(--accent-strong); background:#15334a; box-shadow:0 12px 32px #0004; font-weight:900; letter-spacing:-.08em; }
+    .panel { background:rgba(17,26,45,.9); border:1px solid var(--line); border-radius:20px; padding:16px; box-shadow:0 20px 60px #0004; }
+    .auth { display:flex; gap:14px; align-items:center; justify-content:space-between; padding:2px 2px 16px; border-bottom:1px solid var(--line); }
+    .auth-fields { display:grid; grid-template-columns:minmax(150px,1fr) minmax(190px,1.25fr) minmax(150px,1fr) auto auto; gap:8px; align-items:center; flex:1; }
+    .auth-session { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-wrap:wrap; min-width:260px; }
+    .session-actions { display:flex; align-items:center; gap:8px; }
+    .auth input, .upload-card select, .controls input[type=text] { width:100%; border:1px solid var(--line); background:#091224; color:var(--text); border-radius:9px; padding:9px 10px; outline:none; }
+    .auth input:focus, .upload-card select:focus, .controls input[type=text]:focus, form.chat input:focus { border-color:#5b9db0; box-shadow:0 0 0 3px #5b9db022; }
+    .auth button.secondary, button.secondary { background:#263654; color:var(--text); }
+    .auth-status { color:var(--muted); font-size:12px; flex-basis:100%; }
+    .auth-role { color:#072018; background:var(--accent); border-radius:999px; padding:5px 10px; font-size:12px; font-weight:800; white-space:nowrap; }
+    #admin-link { color:var(--accent-strong); font-size:12px; text-decoration:none; white-space:nowrap; }
+    .workspace-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr); gap:12px; margin-top:14px; }
+    .upload-card, .options-card, .chat-card, .documents { background:var(--panel-2); border:1px solid #1d2d4a; border-radius:14px; padding:15px; }
+    .card-heading, .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .card-title { font-size:15px; font-weight:750; }
+    .card-note { color:var(--muted); font-size:12px; }
+    .upload-row { display:grid; grid-template-columns:auto minmax(90px,1fr) 110px auto; gap:9px; align-items:center; }
+    .file-picker { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 12px; border-radius:9px; background:#1d3958; color:var(--text); font-weight:700; cursor:pointer; white-space:nowrap; }
+    .file-picker:hover { background:#274b70; }
+    .file-input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+    .file-name { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .controls { display:flex; gap:12px; flex-wrap:wrap; color:var(--muted); font-size:12px; }
+    .controls label { cursor:pointer; user-select:none; white-space:nowrap; }
     .controls input { accent-color:var(--accent); vertical-align:-2px; }
-    .controls input[type=text] { width:150px; border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:7px; padding:5px 7px; }
-    input[type=file] { max-width:100%; color:var(--muted); }
-    button { border:0; border-radius:10px; padding:10px 15px; background:var(--accent); color:#082017; font-weight:700; cursor:pointer; }
+    .controls input[type=text] { width:100%; margin-top:7px; }
+    .advanced { margin-top:13px; border-top:1px solid #1d2d4a; padding-top:10px; color:var(--muted); font-size:12px; }
+    .advanced summary { cursor:pointer; color:var(--text); }
+    .advanced label { display:block; margin-top:9px; }
+    button { border:0; border-radius:9px; min-height:38px; padding:0 14px; background:var(--accent); color:#072018; font-weight:800; cursor:pointer; transition:transform .15s ease, filter .15s ease; }
+    button:hover { filter:brightness(1.07); transform:translateY(-1px); }
     button:disabled { opacity:.55; cursor:wait; }
-    .status { color:var(--muted); min-height:24px; flex:1 1 240px; }
-    #messages { min-height:280px; max-height:58vh; overflow:auto; padding:8px 0; }
-    .message { margin:14px 0; padding:13px 15px; border-radius:14px; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .message.user { background:var(--user); margin-left:12%; }
-    .message.assistant { background:#172033; margin-right:8%; }
-    .label { display:block; color:var(--muted); font-size:12px; margin-bottom:5px; text-transform:uppercase; letter-spacing:.08em; }
-    .sources { margin-top:10px; color:var(--muted); font-size:13px; }
+    .status { color:var(--muted); min-height:20px; margin-top:10px; font-size:12px; }
+    .chat-card { margin-top:12px; padding:0; overflow:hidden; }
+    .chat-card .section-head { margin:0; padding:14px 15px; border-bottom:1px solid #1d2d4a; }
+    .chat-title { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:750; }
+    .live-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px #73e3b622; }
+    #messages { min-height:190px; max-height:54vh; overflow:auto; padding:6px 15px; }
+    #messages:empty::before { content:"Đặt câu hỏi để bắt đầu tìm kiếm trong kho tài liệu."; display:block; padding:64px 12px; color:#657692; text-align:center; }
+    .message { margin:11px 0; padding:12px 14px; border:1px solid transparent; border-radius:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .message.user { background:var(--user); border-color:#2c5276; margin-left:14%; }
+    .message.assistant { background:#172238; border-color:#243756; margin-right:10%; }
+    .label { display:block; color:var(--muted); font-size:10px; margin-bottom:5px; text-transform:uppercase; letter-spacing:.12em; }
+    .sources { margin-top:10px; color:var(--muted); font-size:12px; }
     .source-line { margin-top:4px; }
-    .cache-meta { margin-top:10px; color:var(--muted); font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .documents { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; color:var(--muted); font-size:13px; }
+    .cache-meta { margin-top:10px; color:var(--accent-strong); font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    form.chat { display:flex; gap:9px; padding:12px 15px 15px; border-top:1px solid #1d2d4a; }
+    form.chat input { flex:1; min-width:0; border:1px solid var(--line); background:#091224; color:var(--text); border-radius:9px; padding:11px 12px; font:inherit; }
+    form.chat button { min-width:74px; }
+    .documents { margin-top:12px; color:var(--muted); font-size:12px; }
+    .documents .section-head { margin-bottom:4px; }
+    .documents strong { color:var(--text); font-size:14px; }
     .document-row { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid #1b2740; }
-    .document-row button { padding:5px 9px; background:#ef8f8f; color:#301010; font-size:12px; }
-    form.chat { display:flex; gap:10px; margin-top:8px; }
-    form.chat input { flex:1; min-width:0; border:1px solid var(--line); background:#0b1222; color:var(--text); border-radius:10px; padding:12px 13px; font:inherit; }
-    @media (max-width:600px) { main { width:calc(100% - 20px); padding-top:22px; } form.chat { flex-direction:column; } .message.user,.message.assistant { margin-left:0; margin-right:0; } }
+    .document-row button { min-height:30px; padding:0 9px; background:#633442; color:#ffdada; font-size:11px; }
+    @media (max-width:850px) { .auth { align-items:stretch; flex-direction:column; } .auth-fields { width:100%; } .auth-session { justify-content:space-between; width:100%; } }
+    @media (max-width:680px) { main { width:calc(100% - 20px); padding-top:22px; } .hero { align-items:flex-start; } .hero-mark { display:none; } .workspace-grid { grid-template-columns:1fr; } .auth-fields { grid-template-columns:1fr 1fr; } .auth-fields button { width:100%; } .upload-row { grid-template-columns:auto minmax(0,1fr); } .upload-row select, .upload-row button { width:100%; } .file-name { min-width:0; } form.chat { flex-direction:column; } .message.user,.message.assistant { margin-left:0; margin-right:0; } }
+    @media (max-width:420px) { .auth-fields { grid-template-columns:1fr; } .auth-session { align-items:flex-start; flex-direction:column; } .session-actions { width:100%; justify-content:space-between; } }
   </style>
 </head>
 <body>
 <main>
-  <h1>Local RAG</h1>
-  <p class="subtitle">Upload Markdown để indexing, sau đó hỏi trên kho tài liệu.</p>
+  <header class="hero">
+    <div>
+      <div class="eyebrow">Private knowledge workspace</div>
+      <h1>Local RAG</h1>
+      <p class="subtitle">Nạp tài liệu, tìm kiếm có quyền và hỏi đáp ngay trên dữ liệu nội bộ.</p>
+    </div>
+    <div class="hero-mark" aria-hidden="true">R</div>
+  </header>
   <section class="panel">
     <div id="auth" class="auth">
-      <input id="email" type="email" placeholder="Email" autocomplete="username">
-      <input id="password" type="password" placeholder="Mật khẩu (đăng ký mới: tối thiểu 8 ký tự)" autocomplete="current-password">
-      <input id="display-name" type="text" placeholder="Tên hiển thị khi đăng ký" autocomplete="name">
-      <button id="login" type="button">Đăng nhập</button>
-      <button id="register" class="secondary" type="button">Đăng ký</button>
-      <button id="logout" class="secondary" type="button" hidden>Đăng xuất</button>
-      <a id="admin-link" href="/admin" hidden>Quản trị quyền</a>
-      <span id="user-role" class="auth-role" hidden></span>
-      <span id="auth-status" class="auth-status">Chưa đăng nhập.</span>
+      <div id="auth-fields" class="auth-fields">
+        <input id="email" type="email" placeholder="Email" autocomplete="username">
+        <input id="password" type="password" placeholder="Mật khẩu (tối thiểu 8 ký tự)" autocomplete="current-password">
+        <input id="display-name" type="text" placeholder="Tên hiển thị khi đăng ký" autocomplete="name">
+        <button id="login" type="button">Đăng nhập</button>
+        <button id="register" class="secondary" type="button">Đăng ký</button>
+      </div>
+      <div class="auth-session">
+        <div class="session-actions">
+          <button id="logout" class="secondary" type="button" hidden>Đăng xuất</button>
+          <a id="admin-link" href="/admin" hidden>Quản trị quyền</a>
+          <span id="user-role" class="auth-role" hidden></span>
+        </div>
+        <span id="auth-status" class="auth-status">Chưa đăng nhập.</span>
+      </div>
     </div>
-    <div class="upload">
-      <input id="file" type="file" accept=".md,text/markdown">
-      <select id="classification" aria-label="Classification"></select>
-      <button id="upload" type="button">Upload &amp; Index</button>
-      <span id="status" class="status"></span>
+    <div class="workspace-grid">
+      <section class="upload-card">
+        <div class="card-heading">
+          <div>
+            <div class="section-label">01 / Dataset</div>
+            <div class="card-title">Nạp tài liệu</div>
+          </div>
+          <span class="card-note">Markdown</span>
+        </div>
+        <div class="upload-row">
+          <label class="file-picker" for="file">Chọn file</label>
+          <input id="file" class="file-input" type="file" accept=".md,text/markdown">
+          <span id="file-name" class="file-name">Chưa chọn file</span>
+          <select id="classification" aria-label="Classification"></select>
+          <button id="upload" type="button">Upload &amp; Index</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+      <section class="options-card">
+        <div class="card-heading">
+          <div>
+            <div class="section-label">02 / Retrieval</div>
+            <div class="card-title">Tuỳ chọn tìm kiếm</div>
+          </div>
+          <span class="card-note">On / Off</span>
+        </div>
+        <div class="controls">
+          <label><input id="hybrid" type="checkbox" checked> Hybrid</label>
+          <label><input id="rerank" type="checkbox" checked> Rerank</label>
+          <label><input id="show-sources" type="checkbox" checked> Hiện nguồn</label>
+        </div>
+        <details class="advanced">
+          <summary>Thiết lập nâng cao</summary>
+          <label>Conversation ID <input id="conversation-id" type="text" autocomplete="off"></label>
+        </details>
+      </section>
     </div>
-    <div class="controls">
-      <label><input id="hybrid" type="checkbox" checked> Bật hybrid search</label>
-      <label><input id="rerank" type="checkbox" checked> Bật rerank</label>
-      <label><input id="show-sources" type="checkbox" checked> Hiện nguồn</label>
-      <label>Conversation <input id="conversation-id" type="text" autocomplete="off"></label>
-    </div>
-    <div id="messages" aria-live="polite"></div>
-    <form id="chat" class="chat">
-      <input id="question" autocomplete="off" placeholder="Ví dụ: Corrector agent để làm gì?" required>
-      <button id="send" type="submit">Gửi</button>
-    </form>
+    <section class="chat-card">
+      <div class="section-head">
+        <div class="chat-title"><span class="live-dot"></span> Hỏi đáp trên kho tài liệu</div>
+        <span class="card-note">Guardrail · Cache · Memory</span>
+      </div>
+      <div id="messages" aria-live="polite"></div>
+      <form id="chat" class="chat">
+        <input id="question" autocomplete="off" placeholder="Ví dụ: Corrector agent để làm gì?" required>
+        <button id="send" type="submit">Gửi</button>
+      </form>
+    </section>
     <div class="documents">
-      <strong>Tài liệu đã index</strong>
+      <div class="section-head">
+        <strong>Tài liệu đã index</strong>
+        <span class="card-note">Theo quyền đọc hiện tại</span>
+      </div>
       <div id="documents-list">Đăng nhập để xem.</div>
     </div>
   </section>
@@ -117,6 +194,7 @@
     const names = (user.classifications || []).map((item) => item.name);
     const roles = user.roles || [];
     $("auth-status").textContent = `${user.email} · role=${(user.roles || []).join(",") || "none"}`;
+    $("auth-fields").hidden = true;
     $("login").hidden = true; $("register").hidden = true; $("logout").hidden = false;
     $("admin-link").hidden = !roles.includes("admin");
     $("user-role").textContent = "Role: " + (roles.join(", ") || "none");
@@ -128,6 +206,7 @@
     token = ""; localStorage.removeItem("rag-access-token");
     localStorage.removeItem("rag-session-user-id");
     resetChatSession();
+    $("auth-fields").hidden = false;
     $("auth-status").textContent = message; $("login").hidden = false; $("register").hidden = false; $("logout").hidden = true;
     $("admin-link").hidden = true; $("user-role").hidden = true;
     $("classification").replaceChildren(); $("upload").disabled = true; $("send").disabled = true;
@@ -159,6 +238,10 @@
   $("login").onclick = () => authenticate("/auth/login");
   $("register").onclick = () => authenticate("/auth/register");
   $("logout").onclick = () => setLoggedOut("Đã đăng xuất.");
+  $("file").onchange = () => {
+    const file = $("file").files[0];
+    $("file-name").textContent = file ? file.name : "Chưa chọn file";
+  };
   function addMessage(kind, text, sources = [], metadata = null) {
     const box = document.createElement("div");
     box.className = `message ${kind}`;

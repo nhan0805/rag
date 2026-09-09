@@ -3,6 +3,8 @@ import os
 import unittest
 from urllib.request import Request, urlopen
 
+from tests.e2e.auth import auth_headers
+
 
 @unittest.skipUnless(
     os.getenv("RUN_RAG_E2E") == "1",
@@ -11,6 +13,10 @@ from urllib.request import Request, urlopen
 class ChatRerankE2ETests(unittest.TestCase):
     base_url = os.getenv("RAG_EVAL_URL", "http://localhost:8000")
 
+    @classmethod
+    def setUpClass(cls):
+        cls.headers = auth_headers(cls.base_url)
+
     def post_chat(self, rerank):
         body = json.dumps(
             {"question": "Corrector agent để làm gì?", "rerank": rerank}
@@ -18,7 +24,7 @@ class ChatRerankE2ETests(unittest.TestCase):
         request = Request(
             f"{self.base_url}/chat",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={**self.headers, "Content-Type": "application/json"},
             method="POST",
         )
         with urlopen(request, timeout=180) as response:
@@ -37,4 +43,3 @@ class ChatRerankE2ETests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

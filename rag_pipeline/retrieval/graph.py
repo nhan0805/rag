@@ -133,7 +133,10 @@ def _check_cache_node(state: RAGState) -> dict | None:
 
 def _retrieve_node(state: RAGState) -> None:
     allowed_ids = state.get("allowed_classification_ids", [])
-    common = {"allowed_classification_ids": allowed_ids} if allowed_ids else {}
+    # Authenticated HTTP calls always carry a list, including an empty list
+    # (fail closed).  The None path keeps pure graph unit tests independent of
+    # PostgreSQL; it is never used by the API dependency.
+    common = {"allowed_classification_ids": allowed_ids} if allowed_ids is not None else {}
     if state["rerank"] or state["hybrid"]:
         fetch_k = max(settings.retrieve_fetch_k, settings.rerank_top_n)
         chunks = top_k_chunks(
@@ -159,7 +162,7 @@ def _lexical_search_node(state: RAGState) -> None:
         state["lexical_chunks"] = []
         return
     allowed_ids = state.get("allowed_classification_ids", [])
-    if allowed_ids:
+    if allowed_ids is not None:
         state["lexical_chunks"] = lexical_search(
             state["question"], limit=settings.lexical_fetch_k,
             allowed_classification_ids=allowed_ids,
@@ -313,9 +316,11 @@ def run_graph(
         "hybrid": _with_hybrid_flag(hybrid),
         "hybrid_used": False,
         "retrieve_only": retrieve_only,
-        "allowed_classification_ids": [
-            str(value) for value in (allowed_classification_ids or [])
-        ],
+        "allowed_classification_ids": (
+            None
+            if allowed_classification_ids is None
+            else [str(value) for value in allowed_classification_ids]
+        ),
         "user_id": user_id,
         "conversation_id": conversation_id,
         "blocked": False,

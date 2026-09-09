@@ -122,6 +122,18 @@ class Settings:
     memory_enabled: bool = _bool("MEMORY_ENABLED", True)
     memory_turns: int = _int("MEMORY_TURNS", 6)
 
+    # Authentication and authorization.  Roles/classifications are resolved
+    # from PostgreSQL on every request; they are deliberately not embedded in
+    # the JWT so a revoke takes effect immediately.
+    jwt_secret: str = os.getenv("JWT_SECRET", "local-rag-development-secret")
+    jwt_expires_min: int = _int("JWT_EXPIRES_MIN", 720)
+    admin_email: str = os.getenv("ADMIN_EMAIL", "admin@rag.local").strip().lower()
+    admin_password: str = os.getenv("ADMIN_PASSWORD", "")
+    admin_role: str = os.getenv("ADMIN_ROLE", "admin").strip().lower()
+    default_role: str = os.getenv("DEFAULT_ROLE", "").strip().lower()
+    default_classification: str = os.getenv("DEFAULT_CLASSIFICATION", "A").strip().upper()
+    qa_aware_chunking: bool = _bool("QA_AWARE_CHUNKING", False)
+
     @property
     def database_url(self) -> str:
         return (

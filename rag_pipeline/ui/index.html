@@ -5,117 +5,178 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Session 4 — Local RAG</title>
   <style>
-    :root { color-scheme: dark; --bg:#080d1b; --panel:#111a2d; --panel-2:#0d1527; --line:#263756; --text:#eef3ff; --muted:#8e9dbb; --accent:#73e3b6; --accent-strong:#b6f5da; --user:#1d3a5d; --danger:#f29a9a; }
-    * { box-sizing: border-box; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    :root { color-scheme:dark; --bg:#090b16; --panel:#101629; --panel-2:#121b31; --panel-3:#171f37; --line:#2a3553; --line-soft:#202b47; --text:#f4f7ff; --muted:#9ba8c4; --muted-strong:#c2cbe0; --primary:#7c3aed; --primary-soft:#aa8bff; --secondary:#6366f1; --accent:#a8f0d1; --signal:#ec4899; --user:#1d3159; --danger:#ff8a9a; --shadow:0 24px 80px rgba(0,0,0,.28); }
+    * { box-sizing:border-box; }
     [hidden] { display:none !important; }
-    body { margin:0; min-height:100vh; background:radial-gradient(circle at 15% -10%, #1d3157 0, transparent 38%), linear-gradient(145deg, #0a1020, var(--bg) 60%); color:var(--text); font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    main { width:min(1120px, calc(100% - 36px)); margin:0 auto; padding:30px 0 44px; }
-    .hero { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:22px; }
-    .eyebrow, .section-label { color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
-    h1 { margin:5px 0 4px; font-size:clamp(32px,5vw,52px); line-height:1; letter-spacing:-.055em; }
-    .subtitle { margin:0; color:var(--muted); font-size:15px; }
-    .hero-mark { display:grid; place-items:center; width:54px; height:54px; border:1px solid #4d7691; border-radius:16px; color:var(--accent-strong); background:#15334a; box-shadow:0 12px 32px #0004; font-weight:900; letter-spacing:-.08em; }
-    .panel { background:rgba(17,26,45,.9); border:1px solid var(--line); border-radius:20px; padding:16px; box-shadow:0 20px 60px #0004; }
-    .auth { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center; padding:2px 2px 16px; border-bottom:1px solid var(--line); }
-    .auth-fields { display:grid; grid-column:1; grid-template-columns:minmax(150px,1fr) minmax(190px,1.25fr) minmax(150px,1fr) auto auto; gap:8px; align-items:center; }
-    .auth-session { display:grid; grid-column:2; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-width:220px; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 8% -10%, rgba(124,58,237,.33), transparent 34%), radial-gradient(circle at 96% 0%, rgba(99,102,241,.18), transparent 27%), linear-gradient(150deg, #090b16 0%, var(--bg) 55%, #0c0f1d 100%); color:var(--text); font:14px/1.55 'Inter',system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.2; background-image:linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size:44px 44px; mask-image:linear-gradient(to bottom, black, transparent 72%); }
+    main { position:relative; width:min(1180px, calc(100% - 48px)); margin:0 auto; padding:42px 0 72px; }
+    .hero { display:flex; align-items:flex-start; justify-content:space-between; gap:32px; margin-bottom:26px; }
+    .hero-copy { max-width:760px; }
+    .eyebrow, .section-label { color:var(--accent); font:700 10px/1.2 'JetBrains Mono',monospace; letter-spacing:.18em; text-transform:uppercase; }
+    .eyebrow { display:flex; align-items:center; gap:9px; }
+    .brand-dot { width:8px; height:8px; border-radius:50%; background:var(--signal); box-shadow:0 0 0 5px rgba(236,72,153,.12), 0 0 20px rgba(236,72,153,.6); }
+    h1 { margin:12px 0 9px; font-size:clamp(38px,6vw,68px); line-height:.96; letter-spacing:-.065em; }
+    .hero-accent { color:var(--primary-soft); font-weight:500; }
+    .subtitle { max-width:620px; margin:0; color:var(--muted-strong); font-size:16px; line-height:1.65; }
+    .hero-caption { display:flex; align-items:center; flex-wrap:wrap; gap:12px 18px; margin-top:20px; color:var(--muted); font:11px 'JetBrains Mono',monospace; }
+    .hero-caption span { display:inline-flex; align-items:center; gap:7px; }
+    .hero-status-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px rgba(168,240,209,.1); }
+    .hero-mark { display:grid; place-items:center; flex:0 0 72px; width:72px; height:72px; border:1px solid rgba(170,139,255,.6); border-radius:22px; color:#fff; background:linear-gradient(145deg, rgba(124,58,237,.9), rgba(99,102,241,.72)); box-shadow:0 16px 44px rgba(67,43,144,.38), inset 0 1px rgba(255,255,255,.25); }
+    .hero-mark svg { width:34px; height:34px; }
+    .panel { background:rgba(16,22,41,.88); border:1px solid var(--line); border-radius:24px; padding:18px; box-shadow:var(--shadow); backdrop-filter:blur(18px); }
+    .auth { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:center; padding:2px 2px 18px; border-bottom:1px solid var(--line-soft); }
+    .auth-heading { display:flex; align-items:center; gap:10px; grid-column:1 / -1; margin-bottom:-2px; }
+    .auth-heading-mark { display:grid; place-items:center; width:28px; height:28px; border:1px solid rgba(168,240,209,.3); border-radius:9px; color:var(--accent); background:rgba(168,240,209,.08); }
+    .auth-heading-mark svg { width:15px; height:15px; }
+    .auth-heading strong { font-size:13px; }
+    .auth-heading > span { color:var(--muted); font-size:12px; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    .auth-fields { display:grid; grid-column:1; grid-template-columns:minmax(150px,1fr) minmax(190px,1.25fr) minmax(150px,1fr) auto auto; gap:9px; align-items:end; }
+    .input-field { display:grid; gap:6px; min-width:0; }
+    .input-field > span { color:var(--muted); font:600 10px 'JetBrains Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
+    .auth-session { display:grid; grid-column:2; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-width:250px; }
     .auth-fields[hidden] ~ .auth-session { grid-column:1 / -1; }
     .session-actions { display:flex; grid-column:2; grid-row:1; align-items:center; justify-content:flex-end; gap:8px; }
-    .auth input, .upload-card select, .controls input[type=text] { width:100%; border:1px solid var(--line); background:#091224; color:var(--text); border-radius:9px; padding:9px 10px; outline:none; }
-    .auth input:focus, .upload-card select:focus, .controls input[type=text]:focus, form.chat input:focus { border-color:#5b9db0; box-shadow:0 0 0 3px #5b9db022; }
-    .auth button.secondary, button.secondary { background:#263654; color:var(--text); }
+    .auth input, .upload-card select, .advanced input { width:100%; border:1px solid var(--line); background:#0a1020; color:var(--text); border-radius:11px; padding:11px 12px; outline:none; font:inherit; transition:border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+    .auth input::placeholder, .advanced input::placeholder, form.chat input::placeholder { color:#697797; }
+    .auth input:focus, .upload-card select:focus, .advanced input:focus, form.chat input:focus { border-color:var(--primary-soft); box-shadow:0 0 0 4px rgba(124,58,237,.18); background:#0d1428; }
+    .auth button.secondary, button.secondary { background:#263454; color:var(--text); }
     .auth-fields button { min-width:98px; padding-inline:16px; white-space:nowrap; }
     .auth-status { color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .auth-role { color:#072018; background:var(--accent); border-radius:999px; padding:5px 10px; font-size:12px; font-weight:800; white-space:nowrap; }
-    #admin-link { color:var(--accent-strong); font-size:12px; text-decoration:none; white-space:nowrap; }
-    .workspace-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr); gap:12px; align-items:stretch; margin-top:14px; }
-    .upload-card, .options-card, .chat-card, .documents { background:var(--panel-2); border:1px solid #1d2d4a; border-radius:14px; padding:15px; }
+    .auth-role { color:#071a16; background:var(--accent); border-radius:999px; padding:6px 10px; font:700 11px 'JetBrains Mono',monospace; white-space:nowrap; }
+    #admin-link { display:inline-flex; align-items:center; gap:6px; color:var(--accent); font-size:12px; text-decoration:none; white-space:nowrap; }
+    #admin-link:hover { color:#dcffef; }
+    .workspace-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr); gap:12px; align-items:stretch; margin-top:16px; }
+    .upload-card, .options-card, .chat-card, .documents { background:rgba(18,27,49,.88); border:1px solid var(--line-soft); border-radius:17px; padding:17px; }
     .upload-card, .options-card { min-width:0; }
-    .card-heading, .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .card-title { font-size:15px; font-weight:750; }
+    .card-heading, .section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .section-label { display:flex; align-items:center; gap:8px; color:var(--primary-soft); }
+    .section-number { display:inline-grid; place-items:center; min-width:24px; height:20px; padding:0 5px; border:1px solid rgba(170,139,255,.35); border-radius:6px; background:rgba(124,58,237,.12); color:var(--primary-soft); font-size:10px; letter-spacing:0; }
+    .card-title { margin-top:6px; font-size:16px; font-weight:750; letter-spacing:-.02em; }
     .card-note { color:var(--muted); font-size:12px; }
-    .upload-row { display:grid; grid-template-columns:auto minmax(90px,1fr) 110px auto; gap:9px; align-items:center; }
-    .select-field { display:grid; gap:4px; min-width:110px; }
-    .field-label { color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.04em; }
-    .file-picker { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 12px; border-radius:9px; background:#1d3958; color:var(--text); font-weight:700; cursor:pointer; white-space:nowrap; }
-    .file-picker:hover { background:#274b70; }
+    .upload-row { display:grid; grid-template-columns:auto minmax(90px,1fr) 145px auto; gap:10px; align-items:end; }
+    .select-field { display:grid; gap:6px; min-width:110px; }
+    .field-label { color:var(--muted); font:600 10px 'JetBrains Mono',monospace; letter-spacing:.06em; text-transform:uppercase; }
+    .file-picker { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 14px; border:1px solid #384b70; border-radius:11px; background:#1b2a49; color:var(--text); font-weight:700; cursor:pointer; white-space:nowrap; transition:background .2s ease, border-color .2s ease; }
+    .file-picker:hover { background:#263d65; border-color:#5975a3; }
+    .file-picker svg { width:16px; height:16px; color:var(--accent); }
     .file-input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
-    .file-name { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .controls { display:flex; gap:12px; flex-wrap:wrap; color:var(--muted); font-size:12px; }
-    .controls label { cursor:pointer; user-select:none; white-space:nowrap; }
-    .controls input { accent-color:var(--accent); vertical-align:-2px; }
-    .controls input[type=text] { width:100%; margin-top:7px; }
-    .advanced { margin-top:13px; border-top:1px solid #1d2d4a; padding-top:10px; color:var(--muted); font-size:12px; }
-    .advanced summary { cursor:pointer; color:var(--text); }
-    .advanced label { display:block; margin-top:9px; }
-    button { border:0; border-radius:9px; min-height:38px; padding:0 14px; background:var(--accent); color:#072018; font-weight:800; cursor:pointer; transition:transform .15s ease, filter .15s ease; }
-    button:hover { filter:brightness(1.07); transform:translateY(-1px); }
-    button:disabled { background:#22304b; color:#71829f; opacity:1; cursor:not-allowed; filter:none; transform:none; }
-    .status { color:var(--muted); min-height:20px; margin-top:10px; font-size:12px; }
+    .file-name { align-self:center; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .controls { display:flex; gap:9px; flex-wrap:wrap; color:var(--muted-strong); font-size:12px; }
+    .toggle { position:relative; display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 10px; border:1px solid var(--line); border-radius:10px; background:#0d1428; cursor:pointer; user-select:none; white-space:nowrap; transition:border-color .2s ease, background .2s ease, color .2s ease; }
+    .toggle:hover { border-color:#4b5f87; color:var(--text); }
+    .toggle:focus-within { border-color:var(--primary-soft); box-shadow:0 0 0 4px rgba(124,58,237,.15); }
+    .toggle input { position:absolute; width:1px; height:1px; opacity:0; }
+    .toggle-ui { width:26px; height:15px; border-radius:999px; background:#37435f; transition:background .2s ease; }
+    .toggle-ui::after { content:""; display:block; width:11px; height:11px; margin:2px; border-radius:50%; background:#9aa6c3; transition:transform .2s ease, background .2s ease; }
+    .toggle input:checked + .toggle-ui { background:var(--primary); }
+    .toggle input:checked + .toggle-ui::after { transform:translateX(11px); background:#fff; }
+    .toggle input:checked ~ span:last-child { color:#fff; }
+    .advanced { margin-top:14px; border-top:1px solid var(--line-soft); padding-top:11px; color:var(--muted); font-size:12px; }
+    .advanced summary { display:inline-flex; cursor:pointer; color:var(--muted-strong); transition:color .2s ease; }
+    .advanced summary:hover { color:var(--text); }
+    .advanced summary:focus-visible { outline:2px solid var(--primary-soft); outline-offset:4px; border-radius:3px; }
+    .advanced label { display:block; margin-top:10px; }
+    .advanced input { margin-top:6px; }
+    button { border:0; border-radius:11px; min-height:44px; padding:0 15px; background:var(--accent); color:#071a16; font-weight:800; cursor:pointer; transition:filter .2s ease, box-shadow .2s ease, background .2s ease; }
+    button:hover { filter:brightness(1.06); box-shadow:0 8px 18px rgba(0,0,0,.18); }
+    button:focus-visible, a:focus-visible, label:focus-visible { outline:2px solid var(--primary-soft); outline-offset:3px; }
+    button:disabled { background:#26324c; color:#71819f; opacity:1; cursor:not-allowed; filter:none; box-shadow:none; }
+    .status { color:var(--muted); min-height:20px; margin-top:11px; font-size:12px; }
     .chat-card { margin-top:12px; padding:0; overflow:hidden; }
-    .chat-card .section-head { margin:0; padding:14px 15px; border-bottom:1px solid #1d2d4a; }
-    .chat-title { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:750; }
-    .live-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px #73e3b622; }
-    #messages { min-height:190px; max-height:54vh; overflow:auto; padding:6px 15px; }
-    #messages:empty::before { content:"Đặt câu hỏi để bắt đầu tìm kiếm trong kho tài liệu."; display:block; padding:64px 12px; color:#657692; text-align:center; }
-    .message { margin:11px 0; padding:12px 14px; border:1px solid transparent; border-radius:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .message.user { background:var(--user); border-color:#2c5276; margin-left:14%; }
-    .message.assistant { background:#172238; border-color:#243756; margin-right:10%; }
-    .label { display:block; color:var(--muted); font-size:10px; margin-bottom:5px; text-transform:uppercase; letter-spacing:.12em; }
-    .sources { margin-top:10px; color:var(--muted); font-size:12px; }
-    .source-line { margin-top:4px; }
-    .cache-meta { margin-top:10px; color:var(--accent-strong); font-size:11px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-    form.chat { display:flex; gap:9px; padding:12px 15px 15px; border-top:1px solid #1d2d4a; }
-    form.chat input { flex:1; min-width:0; border:1px solid var(--line); background:#091224; color:var(--text); border-radius:9px; padding:11px 12px; font:inherit; }
-    form.chat button { min-width:74px; }
+    .chat-card .section-head { align-items:center; margin:0; padding:17px 18px; border-bottom:1px solid var(--line-soft); }
+    .chat-title-wrap { display:grid; gap:5px; }
+    .chat-kicker { color:var(--primary-soft); font:700 10px 'JetBrains Mono',monospace; letter-spacing:.16em; text-transform:uppercase; }
+    .chat-title { display:flex; align-items:center; gap:9px; font-size:17px; font-weight:750; letter-spacing:-.025em; }
+    .live-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 5px rgba(168,240,209,.1), 0 0 16px rgba(168,240,209,.46); }
+    #messages { min-height:250px; max-height:58vh; overflow:auto; padding:9px 18px; scrollbar-color:#374768 transparent; }
+    #messages:empty::before { content:"Kho tài liệu đã sẵn sàng"; display:block; padding:68px 12px 4px; color:var(--muted-strong); font-size:15px; font-weight:700; text-align:center; }
+    #messages:empty::after { content:"Đăng nhập, nạp file Markdown, rồi đặt câu hỏi để bắt đầu."; display:block; padding:0 12px 68px; color:#71809d; text-align:center; }
+    .message { margin:12px 0; padding:14px 15px; border:1px solid transparent; border-radius:14px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .message.user { background:linear-gradient(135deg, rgba(29,49,89,.96), rgba(26,41,75,.96)); border-color:#385887; margin-left:14%; }
+    .message.assistant { background:linear-gradient(135deg, rgba(23,32,57,.98), rgba(22,30,52,.98)); border-color:#314362; border-left:3px solid var(--primary-soft); margin-right:10%; }
+    .label { display:block; color:var(--muted); font:700 10px 'JetBrains Mono',monospace; margin-bottom:6px; text-transform:uppercase; letter-spacing:.12em; }
+    .message.assistant .label { color:var(--accent); }
+    .sources { margin-top:11px; padding-top:10px; border-top:1px solid rgba(155,168,196,.15); color:var(--muted); font-size:12px; }
+    .source-line { margin-top:5px; overflow-wrap:anywhere; }
+    .cache-meta { margin-top:11px; color:var(--accent); font:11px 'JetBrains Mono',monospace; }
+    form.chat { display:flex; gap:10px; padding:14px 18px 18px; border-top:1px solid var(--line-soft); background:rgba(9,13,26,.45); }
+    form.chat input { flex:1; min-width:0; min-height:48px; border:1px solid var(--line); background:#0a1020; color:var(--text); border-radius:12px; padding:12px 14px; font:inherit; outline:none; transition:border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+    form.chat button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-width:104px; }
+    form.chat button svg { width:16px; height:16px; }
     .documents { margin-top:12px; color:var(--muted); font-size:12px; }
-    .documents .section-head { margin-bottom:4px; }
+    .documents .section-head { align-items:center; margin-bottom:6px; }
     .documents strong { color:var(--text); font-size:14px; }
-    .document-row { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid #1b2740; }
-    .document-row button { min-height:30px; padding:0 9px; background:#633442; color:#ffdada; font-size:11px; }
-    @media (max-width:850px) { .auth { grid-template-columns:1fr; align-items:stretch; } .auth-fields, .auth-session { grid-column:1; width:100%; } .auth-fields[hidden] ~ .auth-session { grid-column:1; } }
-    @media (max-width:680px) { main { width:calc(100% - 20px); padding-top:22px; } .hero { align-items:flex-start; } .hero-mark { display:none; } .workspace-grid { grid-template-columns:1fr; } .auth-fields { grid-template-columns:1fr 1fr; } .auth-fields button { width:100%; } .upload-row { grid-template-columns:auto minmax(0,1fr); } .upload-row select, .upload-row button { width:100%; } .file-name { min-width:0; } form.chat { flex-direction:column; } .message.user,.message.assistant { margin-left:0; margin-right:0; } }
-    @media (max-width:420px) { .auth-fields { grid-template-columns:1fr; } .auth-session { grid-template-columns:1fr; align-items:start; } .session-actions { grid-column:1; grid-row:1; width:100%; justify-content:space-between; } .auth-status { grid-column:1; grid-row:2; } }
+    .document-row { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line-soft); }
+    .document-row:last-child { border-bottom:0; }
+    .document-row span { min-width:0; overflow-wrap:anywhere; }
+    .document-row button { flex:0 0 auto; min-height:34px; padding:0 11px; border:1px solid rgba(255,138,154,.28); background:rgba(255,138,154,.09); color:#ffb4bf; font-size:11px; }
+    @media (max-width:980px) { .auth { grid-template-columns:1fr; align-items:stretch; } .auth-fields, .auth-session { grid-column:1; width:100%; } .auth-fields[hidden] ~ .auth-session { grid-column:1; } .auth-session { min-width:0; } }
+    @media (max-width:720px) { main { width:calc(100% - 28px); padding-top:28px; } .hero { gap:20px; } .hero-mark { flex-basis:58px; width:58px; height:58px; border-radius:18px; } .hero-mark svg { width:28px; height:28px; } .workspace-grid { grid-template-columns:1fr; } .auth-fields { grid-template-columns:1fr 1fr; } .auth-fields button { width:100%; } .upload-row { grid-template-columns:1fr 1fr; align-items:stretch; } .upload-row .file-name { grid-column:1 / -1; min-height:20px; } .upload-row select, .upload-row button { width:100%; } form.chat { flex-direction:column; } form.chat button { width:100%; } .message.user,.message.assistant { margin-left:0; margin-right:0; } }
+    @media (max-width:460px) { main { width:calc(100% - 20px); padding-top:22px; } .panel { padding:12px; border-radius:18px; } .hero-mark { display:none; } .hero-caption { gap:8px 12px; } .auth-fields { grid-template-columns:1fr; } .auth-session { grid-template-columns:1fr; align-items:start; } .session-actions { grid-column:1; grid-row:1; width:100%; justify-content:space-between; flex-wrap:wrap; } .auth-status { grid-column:1; grid-row:2; } .upload-row { grid-template-columns:1fr; } .upload-row .file-name { grid-column:auto; } .controls { display:grid; grid-template-columns:1fr 1fr; } .toggle { justify-content:flex-start; } }
+    @media (prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior:auto !important; transition-duration:.01ms !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; } }
   </style>
 </head>
 <body>
 <main>
   <header class="hero">
-    <div>
-      <div class="eyebrow">Private knowledge workspace</div>
-      <h1>Local RAG</h1>
-      <p class="subtitle">Nạp tài liệu, tìm kiếm có quyền và hỏi đáp ngay trên dữ liệu nội bộ.</p>
+    <div class="hero-copy">
+      <div class="eyebrow"><span class="brand-dot" aria-hidden="true"></span>RAG / private knowledge workspace</div>
+      <h1>Local RAG <span class="hero-accent">/ workspace</span></h1>
+      <p class="subtitle">Nạp tài liệu, truy hồi có quyền và hỏi đáp ngay trên dữ liệu nội bộ — với toàn bộ suy luận chạy tại chỗ.</p>
+      <div class="hero-caption" aria-label="Trạng thái hệ thống">
+        <span><i class="hero-status-dot" aria-hidden="true"></i>Local inference ready</span>
+        <span>Hybrid retrieval · Rerank · Memory</span>
+      </div>
+    </div>
+    <div class="hero-mark" aria-hidden="true">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 12.5A4.5 4.5 0 0 1 12.5 8h15A4.5 4.5 0 0 1 32 12.5v15a4.5 4.5 0 0 1-4.5 4.5h-15A4.5 4.5 0 0 1 8 27.5v-15Z" stroke="currentColor" stroke-width="1.8"/>
+        <path d="m13 25 4.7-5.5 3.7 3.2 5.6-7.2M13 29h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="27.2" cy="15.2" r="1.8" fill="currentColor"/>
+      </svg>
     </div>
   </header>
   <section class="panel">
     <div id="auth" class="auth">
+      <div class="auth-heading">
+        <div class="auth-heading-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.5a4 4 0 0 0-4 4v2h8v-2a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.7"/><rect x="4.5" y="9.5" width="15" height="11" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M12 14v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </div>
+        <strong>Workspace session</strong>
+        <span>Đăng nhập để mở kho tài liệu theo quyền của bạn.</span>
+      </div>
       <div id="auth-fields" class="auth-fields">
-        <input id="email" type="email" placeholder="Email" autocomplete="username">
-        <input id="password" type="password" placeholder="Mật khẩu (tối thiểu 8 ký tự)" autocomplete="current-password">
-        <input id="display-name" type="text" placeholder="Tên hiển thị khi đăng ký" autocomplete="name">
+        <label class="input-field"><span>Email</span><input id="email" type="email" placeholder="you@company.local" autocomplete="username"></label>
+        <label class="input-field"><span>Mật khẩu</span><input id="password" type="password" placeholder="Tối thiểu 8 ký tự" autocomplete="current-password"></label>
+        <label class="input-field"><span>Tên hiển thị</span><input id="display-name" type="text" placeholder="Chỉ dùng khi đăng ký" autocomplete="name"></label>
         <button id="login" type="button">Đăng nhập</button>
         <button id="register" class="secondary" type="button">Đăng ký</button>
       </div>
       <div class="auth-session">
         <div class="session-actions">
           <button id="logout" class="secondary" type="button" hidden>Đăng xuất</button>
-          <a id="admin-link" href="/admin" hidden>Quản trị quyền</a>
+          <a id="admin-link" href="/admin" hidden><span aria-hidden="true">↗</span> Quản trị quyền</a>
           <span id="user-role" class="auth-role" hidden></span>
         </div>
-        <span id="auth-status" class="auth-status">Chưa đăng nhập.</span>
+        <span id="auth-status" class="auth-status" role="status">Chưa đăng nhập.</span>
       </div>
     </div>
     <div class="workspace-grid">
       <section class="upload-card">
         <div class="card-heading">
           <div>
-            <div class="section-label">01 / Dataset</div>
+            <div class="section-label"><span class="section-number">01</span> Dataset</div>
             <div class="card-title">Nạp tài liệu</div>
             <div class="card-note">Chỉ nhận file Markdown (.md)</div>
           </div>
+          <span class="card-note">Index pipeline</span>
         </div>
         <div class="upload-row">
-          <label class="file-picker" for="file">Chọn file .md</label>
+          <label class="file-picker" for="file"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5v3A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Chọn file .md</label>
           <input id="file" class="file-input" type="file" accept=".md,text/markdown">
           <span id="file-name" class="file-name">Chưa chọn file</span>
           <div class="select-field">
@@ -124,44 +185,48 @@
           </div>
           <button id="upload" type="button">Upload &amp; Index</button>
         </div>
-        <div id="status" class="status"></div>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
       </section>
       <section class="options-card">
         <div class="card-heading">
           <div>
-            <div class="section-label">02 / Retrieval</div>
+            <div class="section-label"><span class="section-number">02</span> Retrieval</div>
             <div class="card-title">Tuỳ chọn tìm kiếm</div>
           </div>
-          <span class="card-note">On / Off</span>
+          <span class="card-note">Runtime flags</span>
         </div>
         <div class="controls">
-          <label><input id="hybrid" type="checkbox" checked> Hybrid</label>
-          <label><input id="rerank" type="checkbox" checked> Rerank</label>
-          <label><input id="show-sources" type="checkbox" checked> Hiện nguồn</label>
+          <label class="toggle"><input id="hybrid" type="checkbox" checked><span class="toggle-ui" aria-hidden="true"></span><span>Hybrid</span></label>
+          <label class="toggle"><input id="rerank" type="checkbox" checked><span class="toggle-ui" aria-hidden="true"></span><span>Rerank</span></label>
+          <label class="toggle"><input id="show-sources" type="checkbox" checked><span class="toggle-ui" aria-hidden="true"></span><span>Hiện nguồn</span></label>
         </div>
         <details class="advanced">
           <summary>Thiết lập nâng cao</summary>
-          <label>Conversation ID <input id="conversation-id" type="text" autocomplete="off"></label>
+          <label>Conversation ID <input id="conversation-id" type="text" autocomplete="off" aria-label="Conversation ID"></label>
         </details>
       </section>
     </div>
     <section class="chat-card">
       <div class="section-head">
-        <div class="chat-title"><span class="live-dot"></span> Hỏi đáp trên kho tài liệu</div>
+        <div class="chat-title-wrap">
+          <div class="chat-kicker">03 / Answer layer</div>
+          <div class="chat-title"><span class="live-dot" aria-hidden="true"></span> Hỏi đáp trên kho tài liệu</div>
+        </div>
         <span class="card-note">Guardrail · Cache · Memory</span>
       </div>
       <div id="messages" aria-live="polite"></div>
       <form id="chat" class="chat">
+        <label class="sr-only" for="question">Câu hỏi</label>
         <input id="question" autocomplete="off" placeholder="Ví dụ: Corrector agent để làm gì?" required>
-        <button id="send" type="submit">Gửi</button>
+        <button id="send" type="submit">Gửi câu hỏi <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="m5 12 14-7-3.6 14-3.1-5.4L5 12Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m12.3 13.6 6.7-8.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
       </form>
     </section>
     <div class="documents">
       <div class="section-head">
-        <strong>Tài liệu đã index</strong>
+        <div><div class="section-label"><span class="section-number">04</span> Corpus</div><strong>Tài liệu đã index</strong></div>
         <span class="card-note">Theo quyền đọc hiện tại</span>
       </div>
-      <div id="documents-list">Đăng nhập để xem.</div>
+      <div id="documents-list" role="region" aria-label="Tài liệu đã index">Đăng nhập để xem.</div>
     </div>
   </section>
 </main>
@@ -234,6 +299,7 @@
         const row = document.createElement("div"); row.className = "document-row";
         const label = document.createElement("span"); label.textContent = `${item.source_path} · ${item.classification} · ${item.chunk_count} chunks · sha256=${item.content_sha256}`;
         const remove = document.createElement("button"); remove.textContent = "Xoá";
+        remove.setAttribute("aria-label", `Xoá tài liệu ${item.source_path}`);
         remove.onclick = async () => { if (!confirm(`Xoá ${item.source_path}?`)) return; try { await api(`/documents/${item.id}`, {method:"DELETE"}); await refreshDocuments(); } catch (error) { $("status").textContent = error.message; } };
         row.append(label, remove); list.append(row);
       });

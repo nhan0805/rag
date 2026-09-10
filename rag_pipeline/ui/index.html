@@ -28,8 +28,9 @@
     .auth-status { color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .auth-role { color:#072018; background:var(--accent); border-radius:999px; padding:5px 10px; font-size:12px; font-weight:800; white-space:nowrap; }
     #admin-link { color:var(--accent-strong); font-size:12px; text-decoration:none; white-space:nowrap; }
-    .workspace-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr); gap:12px; align-items:start; margin-top:14px; }
+    .workspace-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(290px,.65fr); gap:12px; align-items:stretch; margin-top:14px; }
     .upload-card, .options-card, .chat-card, .documents { background:var(--panel-2); border:1px solid #1d2d4a; border-radius:14px; padding:15px; }
+    .upload-card, .options-card { min-width:0; }
     .card-heading, .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
     .card-title { font-size:15px; font-weight:750; }
     .card-note { color:var(--muted); font-size:12px; }

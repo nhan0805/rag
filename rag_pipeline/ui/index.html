@@ -32,6 +32,8 @@
     .card-title { font-size:15px; font-weight:750; }
     .card-note { color:var(--muted); font-size:12px; }
     .upload-row { display:grid; grid-template-columns:auto minmax(90px,1fr) 110px auto; gap:9px; align-items:center; }
+    .select-field { display:grid; gap:4px; min-width:110px; }
+    .field-label { color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.04em; }
     .file-picker { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 12px; border-radius:9px; background:#1d3958; color:var(--text); font-weight:700; cursor:pointer; white-space:nowrap; }
     .file-picker:hover { background:#274b70; }
     .file-input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
@@ -113,7 +115,10 @@
           <label class="file-picker" for="file">Chọn file</label>
           <input id="file" class="file-input" type="file" accept=".md,text/markdown">
           <span id="file-name" class="file-name">Chưa chọn file</span>
-          <select id="classification" aria-label="Classification"></select>
+          <div class="select-field">
+            <label class="field-label" for="classification">Classification</label>
+            <select id="classification" aria-label="Classification"></select>
+          </div>
           <button id="upload" type="button">Upload &amp; Index</button>
         </div>
         <div id="status" class="status"></div>
